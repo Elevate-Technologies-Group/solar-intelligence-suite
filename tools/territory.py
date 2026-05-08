@@ -160,24 +160,47 @@ def scan_territory(
 
 
 def multi_zip_comparison(zip_codes: list, sample_size: int = 5) -> dict:
-    """Scan multiple zip codes and rank territories by solar potential."""
-    results = []
+    """Scan multiple zip codes and rank territories by solar potential.
+
+    Returns rich territory data including top prospects, warm lead counts,
+    avg sunshine hours, and top lead score for leaderboard displays.
+    """
+    ranked = []
     for zip_code in zip_codes:
         print(f"\n{'='*50}")
         scan = scan_territory(zip_code, sample_size=sample_size)
         if "error" not in scan:
-            results.append({
+            prospects = scan.get("prospects", [])
+            warm_leads = [p for p in prospects if p.get("priority") == "WARM"]
+            avg_sunshine = (
+                sum(p.get("sunshine_hours_per_year", 0) for p in prospects) / len(prospects)
+                if prospects else 0
+            )
+            top_score = prospects[0].get("lead_score", 0) if prospects else 0
+            ranked.append({
                 "zip_code": zip_code,
+                "territory_grade": scan["territory_grade"],
+                "avg_lead_score": scan["avg_lead_score"],
+                "hot_leads": scan["hot_leads"],
+                "warm_leads": len(warm_leads),
+                "leads_enriched": scan["leads_enriched"],
+                "avg_annual_savings_usd": scan["avg_annual_savings_usd"],
+                "avg_payback_years": scan["avg_payback_years"],
+                "avg_sunshine_hours": round(avg_sunshine),
+                "top_lead_score": top_score,
+                "top_prospects": prospects[:5],
+                # Legacy keys for backward compat
                 "grade": scan["territory_grade"],
                 "avg_score": scan["avg_lead_score"],
-                "hot_leads": scan["hot_leads"],
                 "avg_savings_yr1": scan["avg_annual_savings_usd"],
                 "avg_payback_yrs": scan["avg_payback_years"],
             })
-    
-    results.sort(key=lambda x: x["avg_score"], reverse=True)
+
+    ranked.sort(key=lambda x: x["avg_lead_score"], reverse=True)
     return {
         "territories_scanned": len(zip_codes),
-        "rankings": results,
-        "best_territory": results[0] if results else None
+        "ranked": ranked,
+        # Legacy key
+        "rankings": ranked,
+        "best_territory": ranked[0] if ranked else None,
     }
