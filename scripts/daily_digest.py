@@ -367,6 +367,37 @@ def main():
     print(f"   Territories: {len(territories)} | Leads: {stats.get('total_leads', 0)} | HOT: {stats.get('hot_leads', 0)} | WARM: {stats.get('warm_leads', 0)}")
     print(f"   Avg score: {stats.get('avg_score', 0)}/100 | Pipeline value: ${stats.get('total_annual_savings_pipeline', 0):,}/yr")
 
+    # ── Discord: post daily digest embed (if DISCORD_WEBHOOK_URL is set) ─────
+    try:
+        from integrations.discord_alerts import notify_daily_digest
+        # Build stats dict for the Discord embed
+        discord_stats = {
+            "total_leads":           stats.get("total_leads", 0),
+            "hot_leads":             stats.get("hot_leads", 0),
+            "warm_leads":            stats.get("warm_leads", 0),
+            "avg_lead_score":        stats.get("avg_score", 0.0),
+            "total_pipeline_value":  stats.get("total_annual_savings_pipeline", 0),
+            "avg_annual_savings":    stats.get("avg_annual_savings", 0.0),
+            "territory_count":       len(territories),
+            "top_lead_address":      top_leads[0].get("address") if top_leads else "",
+            "top_lead_score":        top_leads[0].get("lead_score") if top_leads else 0,
+            "territory_rankings": [
+                {
+                    "zip_code":        t.get("zip_code", "?"),
+                    "city":            t.get("city", ""),
+                    "territory_grade": t.get("territory_grade", "?"),
+                    "avg_lead_score":  t.get("avg_lead_score", 0),
+                    "hot_leads":       t.get("hot_leads", 0),
+                }
+                for t in territories
+            ],
+        }
+        ok = notify_daily_digest(stats=discord_stats)
+        if ok:
+            print(f"   📣 Discord daily digest posted")
+    except Exception as _e:
+        pass  # Discord is optional
+
 
 if __name__ == "__main__":
     main()

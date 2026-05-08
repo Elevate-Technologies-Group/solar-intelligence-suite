@@ -226,6 +226,40 @@ def main():
     log(f"   Avg score         : {avg_score:.1f}/100")
     log(f"   Output saved to   : {output_path}")
 
+    # ── Discord notification (if DISCORD_WEBHOOK_URL is set) ─────────────────
+    try:
+        from integrations.discord_alerts import notify_batch_results
+        # Build full lead objects list for the notifier
+        from core.solar import enrich_lead as _enrich_lead
+        import json as _json
+        # results are flat CSV dicts; reconstruct minimal lead objects
+        lead_objects = []
+        for r in results:
+            if r.get("error"):
+                continue
+            lead_objects.append({
+                "formatted_address": r.get("address", ""),
+                "lead_grade":        r.get("lead_grade", ""),
+                "priority":          r.get("priority", ""),
+                "lead_score":        r.get("lead_score", 0),
+                "monthly_bill_usd":  r.get("monthly_bill_usd", 0),
+                "annual_savings_yr1_usd": r.get("annual_savings_yr1_usd", 0),
+                "lifetime_savings_usd":   r.get("lifetime_savings_usd", 0),
+                "net_cost_usd":       r.get("net_cost_usd", 0),
+                "payback_years":      r.get("payback_years", 0),
+                "system_size_kw":     r.get("system_size_kw", 0),
+                "panels_recommended": r.get("panels_recommended", 0),
+                "roof_segments":      r.get("roof_segments", 0),
+                "sunshine_hours_per_year": r.get("sunshine_hours_per_year", 0),
+                "imagery_date":       r.get("imagery_date", ""),
+            })
+        source_name = os.path.basename(args.input_csv)
+        notify_batch_results(lead_objects, source_file=source_name, hot_only=False)
+        if hot > 0:
+            log(f"   📣 Discord alert sent ({hot} HOT leads)")
+    except Exception as _e:
+        pass  # Discord is optional — never crash the main script
+
 
 if __name__ == "__main__":
     main()

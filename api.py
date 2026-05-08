@@ -18,6 +18,16 @@ import uvicorn
 from core.solar import enrich_lead, geocode_address
 from tools.territory import scan_territory, multi_zip_comparison
 
+# Discord alerts (optional — skips silently if DISCORD_WEBHOOK_URL not set)
+try:
+    from integrations.discord_alerts import notify_hot_lead, notify_batch_results, notify_territory_scan
+    _discord_enabled = True
+except Exception:
+    _discord_enabled = False
+    def notify_hot_lead(*a, **kw): return False
+    def notify_batch_results(*a, **kw): return False
+    def notify_territory_scan(*a, **kw): return False
+
 app = FastAPI(
     title="Solar Intelligence Suite",
     description="AI-powered solar lead enrichment and territory analysis for solar sales teams",
@@ -87,6 +97,12 @@ async def enrich_lead_endpoint(req: LeadRequest):
     result = enrich_lead(req.address, req.monthly_bill, req.utility_rate)
     if "error" in result:
         raise HTTPException(status_code=422, detail=result["error"])
+    # Discord: ping on HOT/WARM leads (fire-and-forget, non-blocking)
+    try:
+        if result.get("priority") in ("HOT", "WARM"):
+            notify_hot_lead(result, source="api/lead/enrich")
+    except Exception:
+        pass
     return result
 
 
@@ -109,6 +125,11 @@ async def territory_scan(req: TerritoryRequest):
     result = scan_territory(req.zip_code, req.sample_size, req.avg_monthly_bill)
     if "error" in result:
         raise HTTPException(status_code=422, detail=result["error"])
+    # Discord: notify on territory scan completion
+    try:
+        notify_territory_scan(result)
+    except Exception:
+        pass
     return result
 
 
@@ -171,6 +192,12 @@ async def batch_lead_enrich(req: BatchLeadRequest):
         sum(r.get("lead_score", 0) for r in results) / len(results)
         if results else 0
     )
+
+    # Discord: fire batch summary + individual HOT lead pings
+    try:
+        notify_batch_results(results, source_file=f"api/lead/batch ({len(req.addresses)} addrs)", hot_only=False)
+    except Exception:
+        pass
 
     return {
         "total_requested": len(req.addresses),
