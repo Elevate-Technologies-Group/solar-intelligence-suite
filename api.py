@@ -32,6 +32,17 @@ try:
 except Exception:
     _followup_enabled = False
 
+# Territory report generator import (optional — graceful if missing)
+try:
+    from scripts.generate_territory_report import (
+        get_territory_data as _get_territory_data,
+        generate_territory_report_html as _gen_territory_html,
+        save_report as _save_territory_report,
+    )
+    _territory_report_enabled = True
+except Exception as _e:
+    _territory_report_enabled = False
+
 try:
     from integrations.discord_alerts import notify_hot_lead, notify_batch_results, notify_territory_scan
     _discord_enabled = True
@@ -759,6 +770,97 @@ async def generate_followup_get(
         "summary": seq["summary"],
         "lead": seq["lead"],
         "file_path": file_path,
+    }
+
+
+@app.get("/api/territory/report", response_class=HTMLResponse)
+async def territory_report_html(
+    zip_code: str = Query(..., description="ZIP code to generate report for"),
+    monthly_bill: float = Query(175.0, description="Assumed monthly electric bill"),
+    company: str = Query("Elevate Solar", description="Company name on report"),
+    live: bool = Query(False, description="Force fresh scan (ignore cache)"),
+    download: bool = Query(False, description="Return as file download attachment"),
+):
+    """
+    Generate a standalone HTML Territory Intelligence Report for any ZIP code.
+    Reads cached territory data or runs a live scan.
+    Returns a beautiful, printable HTML page — open directly in browser.
+
+    Example: GET /api/territory/report?zip_code=85234
+    """
+    if not _territory_report_enabled:
+        raise HTTPException(status_code=503, detail="Territory report module unavailable.")
+
+    try:
+        data = _get_territory_data(zip_code, live=live, monthly_bill=monthly_bill)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to load territory data: {e}")
+
+    if not data:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No data for ZIP {zip_code}. Use ?live=true to trigger a fresh scan."
+        )
+
+    html = _gen_territory_html(data, zip_code, generated_by=company)
+
+    # Save a copy to cache
+    try:
+        saved_path = _save_territory_report(html, zip_code)
+    except Exception:
+        saved_path = None
+
+    if download:
+        from fastapi.responses import Response
+        return Response(
+            content=html,
+            media_type="text/html",
+            headers={"Content-Disposition": f"attachment; filename=territory_{zip_code}.html"},
+        )
+
+    return HTMLResponse(content=html)
+
+
+@app.get("/api/territory/report/json")
+async def territory_report_json(
+    zip_code: str = Query(..., description="ZIP code"),
+    monthly_bill: float = Query(175.0, description="Assumed monthly electric bill"),
+    live: bool = Query(False, description="Force fresh scan"),
+):
+    """
+    Return territory data as JSON (same data that powers the HTML report).
+    Useful for building custom dashboards or exporting to GHL/CRMs.
+    """
+    if not _territory_report_enabled:
+        raise HTTPException(status_code=503, detail="Territory report module unavailable.")
+
+    try:
+        data = _get_territory_data(zip_code, live=live, monthly_bill=monthly_bill)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to load territory data: {e}")
+
+    if not data:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No data for ZIP {zip_code}. Use ?live=true to trigger a fresh scan."
+        )
+
+    prospects = data.get("prospects", [])
+    return {
+        "zip_code": zip_code,
+        "center": data.get("center", ""),
+        "territory_grade": data.get("territory_grade", "UNKNOWN"),
+        "avg_lead_score": data.get("avg_lead_score", 0),
+        "total_leads": len(prospects),
+        "hot_leads": data.get("hot_leads", 0),
+        "warm_leads": sum(1 for p in prospects if p.get("priority") == "WARM"),
+        "avg_annual_savings_usd": data.get("avg_annual_savings_usd", 0),
+        "avg_payback_years": data.get("avg_payback_years", 0),
+        "total_pipeline_yr1_usd": sum(
+            p.get("annual_savings_yr1_usd", 0) for p in prospects if p.get("priority") in ("HOT","WARM")
+        ),
+        "prospects": prospects,
+        "report_url": f"/api/territory/report?zip_code={zip_code}",
     }
 
 

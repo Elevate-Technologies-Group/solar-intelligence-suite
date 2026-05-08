@@ -153,6 +153,7 @@
     <div class="tab" onclick="switchTab('canvass')">🚪 Canvass Route</div>
     <div class="tab" onclick="switchTab('history')" id="history-tab">📋 Lead History</div>
     <div class="tab" onclick="switchTab('followup')">💬 Follow-Up Sequences</div>
+    <div class="tab" onclick="switchTab('territory-report')">📊 Territory Reports</div>
     <div class="tab" onclick="switchTab('about')">📖 How It Works</div>
   </div>
 
@@ -481,6 +482,63 @@
     <div id="fu-touches" style="margin-top:16px;"></div>
   </div>
 
+  <!-- TERRITORY REPORTS PANEL -->
+  <div id="tab-territory-report" class="panel">
+    <div class="grid-2">
+      <div class="card" style="grid-column:1/3">
+        <div class="card-title"><span>📊</span> Territory Intelligence Reports</div>
+        <p style="color:var(--muted);font-size:13px;margin-bottom:16px">
+          Generate a beautiful, printable HTML territory briefing for any ZIP code — lead cards, score breakdowns, financial summaries, and rep talking points. Share with your team before canvassing.
+        </p>
+        <div class="input-row">
+          <div class="form-group">
+            <label>ZIP Code</label>
+            <input type="text" id="report-zip" placeholder="85234" maxlength="10" style="width:160px" />
+          </div>
+          <div class="form-group">
+            <label>Monthly Bill ($)</label>
+            <input type="number" id="report-bill" value="175" min="50" max="1000" style="width:120px" />
+          </div>
+          <div class="form-group">
+            <label>Company Name</label>
+            <input type="text" id="report-company" value="Elevate Solar" style="width:200px" />
+          </div>
+        </div>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px">
+          <button class="btn btn-primary" onclick="openTerritoryReport()" id="report-btn">📊 Open Report in New Tab</button>
+          <button class="btn" onclick="downloadTerritoryReport()" id="report-dl-btn">💾 Download HTML</button>
+          <button class="btn" onclick="loadTerritoryReportPreview()" id="report-preview-btn">👁️ Preview Here</button>
+        </div>
+        <div id="report-error" style="color:var(--orange);font-size:13px;margin-top:8px"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title"><span>📁</span> Cached Territories</div>
+        <div id="territory-report-list" style="color:var(--muted);font-size:13px">Loading...</div>
+      </div>
+
+      <div class="card">
+        <div class="card-title"><span>💡</span> What's In a Territory Report</div>
+        <div style="font-size:13px;color:var(--muted);line-height:1.9">
+          <p>📊 <strong style="color:var(--accent)">KPI Summary</strong> — HOT/WARM counts, avg savings, payback, pipeline $/yr</p>
+          <p>🎯 <strong style="color:var(--accent)">Score Breakdown Table</strong> — per-lead scoring by sunshine, roof, bill, payback, ROI</p>
+          <p>🏠 <strong style="color:var(--accent)">Lead Cards</strong> — ranked by score with score rings, financials, talking points</p>
+          <p>🌱 <strong style="color:var(--accent)">Environmental Impact</strong> — CO₂ offset, tree equivalents for territory total</p>
+          <p>🖨️ <strong style="color:var(--accent)">Print-Ready</strong> — Save as PDF from any browser, email to manager</p>
+          <p style="margin-top:12px;color:var(--green)">💡 Pro Tip: Share before a canvass block to brief your whole team at once.</p>
+        </div>
+      </div>
+    </div>
+
+    <div id="report-preview-container" style="display:none;margin-top:20px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <div style="color:var(--accent);font-size:14px;font-weight:700">📊 Report Preview</div>
+        <button class="btn" onclick="document.getElementById('report-preview-container').style.display='none'">✕ Close Preview</button>
+      </div>
+      <iframe id="report-preview-iframe" style="width:100%;height:800px;border:1px solid #334155;border-radius:8px;background:#0f172a" src="about:blank"></iframe>
+    </div>
+  </div>
+
   <!-- ABOUT PANEL -->
   <div id="tab-about" class="panel">
     <div class="grid-2">
@@ -678,6 +736,7 @@ function switchTab(name) {
   event.target.classList.add('active');
   document.getElementById('tab-' + name).classList.add('active');
   if (name === 'history') loadHistory();
+  if (name === 'territory-report') loadCachedTerritoryList();
   if (name === 'canvass') {
     // pre-fill with a Gilbert example if empty
     const ca = document.getElementById('canvass-address');
@@ -1233,6 +1292,86 @@ async function generateProposal() {
   } catch(e) {
     document.getElementById('proposal-result').innerHTML = `<div class="error-msg">❌ ${e.message}</div>`;
   }
+}
+
+// ── Territory Intelligence Reports ────────────────────────────────────────────
+
+async function loadCachedTerritoryList() {
+  const el = document.getElementById('territory-report-list');
+  try {
+    const r = await fetch(`${API}/api/stats`);
+    const stats = await r.json();
+    const territories = stats.territories || [];
+    if (!territories.length) {
+      el.innerHTML = '<span style="color:var(--muted)">No cached territory scans yet. Run a Territory Scanner scan first.</span>';
+      return;
+    }
+    const gradeColors = { HOT: '#dc2626', WARM: '#f59e0b', COOL: '#3b82f6', LOW: '#6b7280' };
+    el.innerHTML = '<div style="display:flex;flex-direction:column;gap:10px">' +
+      territories.map(t => {
+        const gc = gradeColors[t.territory_grade] || '#6b7280';
+        return `<div style="background:#0f172a;border-radius:8px;padding:12px;border-left:3px solid ${gc};display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+          <div>
+            <div style="color:#f1f5f9;font-weight:600;font-size:14px">ZIP ${t.zip_code}</div>
+            <div style="color:var(--muted);font-size:12px">${t.territory_grade} · Score ${t.avg_lead_score}/100 · ${t.hot_leads} HOT · $${t.avg_annual_savings_usd?.toLocaleString()}/yr avg</div>
+          </div>
+          <div style="display:flex;gap:8px;flex-shrink:0">
+            <button class="btn" style="font-size:12px;padding:4px 10px"
+              onclick="document.getElementById('report-zip').value='${t.zip_code}'; openTerritoryReport()">
+              📊 Open
+            </button>
+            <button class="btn" style="font-size:12px;padding:4px 10px"
+              onclick="document.getElementById('report-zip').value='${t.zip_code}'; loadTerritoryReportPreview()">
+              👁️ Preview
+            </button>
+          </div>
+        </div>`;
+      }).join('') + '</div>';
+  } catch(e) {
+    el.innerHTML = `<span style="color:var(--orange)">Failed to load territories: ${e.message}</span>`;
+  }
+}
+
+function _getTerritoryReportUrl(mode) {
+  const zip = document.getElementById('report-zip').value.trim();
+  const bill = document.getElementById('report-bill').value || 175;
+  const company = encodeURIComponent(document.getElementById('report-company').value || 'Elevate Solar');
+  const errEl = document.getElementById('report-error');
+  if (!zip) { errEl.textContent = '⚠️ Please enter a ZIP code first.'; return null; }
+  errEl.textContent = '';
+  let url = `${API}/api/territory/report?zip_code=${zip}&monthly_bill=${bill}&company=${company}`;
+  if (mode === 'download') url += '&download=true';
+  return url;
+}
+
+function openTerritoryReport() {
+  const url = _getTerritoryReportUrl('view');
+  if (url) window.open(url, '_blank');
+}
+
+function downloadTerritoryReport() {
+  const url = _getTerritoryReportUrl('download');
+  if (url) {
+    const a = document.createElement('a');
+    const zip = document.getElementById('report-zip').value.trim();
+    a.href = url;
+    a.download = `territory_${zip}.html`;
+    a.click();
+  }
+}
+
+async function loadTerritoryReportPreview() {
+  const url = _getTerritoryReportUrl('view');
+  if (!url) return;
+  const btn = document.getElementById('report-preview-btn');
+  const container = document.getElementById('report-preview-container');
+  const iframe = document.getElementById('report-preview-iframe');
+  btn.textContent = '⏳ Loading...';
+  btn.disabled = true;
+  container.style.display = 'block';
+  iframe.src = url;
+  iframe.onload = () => { btn.textContent = '👁️ Preview Here'; btn.disabled = false; };
+  iframe.scrollIntoView({ behavior: 'smooth' });
 }
 </script>
 </body>
