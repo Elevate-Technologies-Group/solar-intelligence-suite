@@ -4,6 +4,7 @@ Endpoints: lead enrichment, territory scan, proposal generation, health
 Run with: uvicorn api:app --host 0.0.0.0 --port 8765 --reload
 """
 import sys, os, json
+from concurrent.futures import ThreadPoolExecutor, as_completed
 sys.path.insert(0, "/root/solar-tools")
 
 from fastapi import FastAPI, HTTPException, Query, Body
@@ -51,6 +52,13 @@ class TerritoryRequest(BaseModel):
 class MultiZipRequest(BaseModel):
     zip_codes: list[str]
     sample_size: int = 5
+
+
+class BatchLeadRequest(BaseModel):
+    addresses: list[str]
+    monthly_bill: float = 150.0
+    utility_rate: float = 0.14
+    max_workers: int = 4
 
 
 # ─── routes ───────────────────────────────────────────────────────────────────
@@ -111,6 +119,69 @@ async def territory_compare(req: MultiZipRequest):
         raise HTTPException(status_code=400, detail="Max 5 zip codes per comparison")
     result = multi_zip_comparison(req.zip_codes, req.sample_size)
     return result
+
+
+@app.post("/api/lead/batch")
+async def batch_lead_enrich(req: BatchLeadRequest):
+    """
+    Enrich up to 10 addresses in parallel and return all results.
+
+    Accepts a list of addresses with a shared monthly_bill and utility_rate.
+    Results are returned sorted by lead_score (descending) so the hottest
+    leads bubble to the top.
+
+    Example request body:
+        {
+          "addresses": [
+            "1234 W Main St, Phoenix, AZ 85001",
+            "5678 N 32nd St, Scottsdale, AZ 85251"
+          ],
+          "monthly_bill": 195,
+          "utility_rate": 0.14
+        }
+    """
+    if not req.addresses:
+        raise HTTPException(status_code=400, detail="addresses list cannot be empty")
+    if len(req.addresses) > 10:
+        raise HTTPException(status_code=400, detail="Max 10 addresses per batch request")
+
+    workers = min(req.max_workers, 5)  # cap at 5 parallel workers
+
+    results = []
+    errors  = []
+
+    def _enrich(address: str):
+        return address, enrich_lead(address, req.monthly_bill, req.utility_rate)
+
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        futures = {executor.submit(_enrich, addr): addr for addr in req.addresses}
+        for future in as_completed(futures):
+            address, lead = future.result()
+            if "error" in lead:
+                errors.append({"address": address, "error": lead["error"]})
+            else:
+                results.append(lead)
+
+    # Sort successful results by lead score descending
+    results.sort(key=lambda r: r.get("lead_score", 0), reverse=True)
+
+    hot  = sum(1 for r in results if r.get("priority") == "HOT")
+    warm = sum(1 for r in results if r.get("priority") == "WARM")
+    avg_score = (
+        sum(r.get("lead_score", 0) for r in results) / len(results)
+        if results else 0
+    )
+
+    return {
+        "total_requested": len(req.addresses),
+        "total_enriched": len(results),
+        "total_errors": len(errors),
+        "hot_leads": hot,
+        "warm_leads": warm,
+        "avg_lead_score": round(avg_score, 1),
+        "results": results,
+        "errors": errors,
+    }
 
 
 @app.get("/api/territory/cached")
