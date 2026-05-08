@@ -349,5 +349,128 @@ async def canvass_neighborhood(req: CanvassRequest):
     return result
 
 
+
+# ─── Proposal generator import (optional) ─────────────────────────────────────
+try:
+    from scripts.generate_proposal import render_proposal as _render_proposal
+    _proposal_enabled = True
+except Exception as _e:
+    _proposal_enabled = False
+
+
+class ProposalRequest(BaseModel):
+    address: str
+    monthly_bill: float = 150.0
+    utility_rate: float = 0.14
+    homeowner_name: str = ""
+    rep_name: str = ""
+    company_name: str = "Elevate Solar"
+    save_file: bool = True
+
+
+@app.post("/api/lead/proposal")
+async def generate_proposal(req: ProposalRequest):
+    """
+    Generate a standalone HTML solar proposal for a homeowner.
+
+    Enriches the address with full solar analysis, then renders a
+    beautiful, branded HTML one-pager the rep can email or text to
+    the prospect directly from the field.
+
+    Returns:
+      - html_proposal: the full HTML string (inline, no external deps)
+      - file_path: path where the file was saved on the server (if save_file=True)
+      - lead: the enriched lead data used to build the proposal
+      - summary: key figures for quick reference
+
+    Example:
+        POST /api/lead/proposal
+        {
+          "address": "1905 E Marquette Dr, Gilbert AZ 85234",
+          "monthly_bill": 195,
+          "homeowner_name": "The Garcia Family",
+          "rep_name": "Jake Torres"
+        }
+    """
+    if not _proposal_enabled:
+        raise HTTPException(status_code=503, detail="Proposal module unavailable. Check scripts/generate_proposal.py.")
+
+    lead = enrich_lead(req.address, req.monthly_bill, req.utility_rate)
+    if "error" in lead:
+        raise HTTPException(status_code=422, detail=lead["error"])
+
+    html = _render_proposal(
+        lead,
+        homeowner_name=req.homeowner_name,
+        rep_name=req.rep_name,
+        company_name=req.company_name,
+    )
+
+    file_path = None
+    if req.save_file:
+        import re
+        from pathlib import Path
+        from datetime import datetime
+        proposals_dir = Path("/root/solar-tools/cache/proposals")
+        proposals_dir.mkdir(parents=True, exist_ok=True)
+        slug = re.sub(r'[^a-z0-9]+', '_', lead['address'].lower())[:60]
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        out_path = proposals_dir / f"proposal_{slug}_{ts}.html"
+        out_path.write_text(html, encoding="utf-8")
+        file_path = str(out_path)
+
+    return {
+        "html_proposal": html,
+        "file_path": file_path,
+        "lead": lead,
+        "summary": {
+            "address": lead["address"],
+            "lead_score": lead["lead_score"],
+            "priority": lead["priority"],
+            "grade": lead["lead_grade"],
+            "annual_savings_usd": lead["annual_savings_yr1_usd"],
+            "lifetime_savings_usd": lead["lifetime_savings_usd"],
+            "payback_years": lead["payback_years"],
+            "system_size_kw": lead["system_size_kw"],
+            "panels": lead["panels_recommended"],
+            "net_cost_usd": lead["net_cost_usd"],
+            "federal_itc_usd": lead["federal_itc_usd"],
+        }
+    }
+
+
+@app.get("/api/lead/proposal")
+async def generate_proposal_get(
+    address: str = Query(..., description="Full street address"),
+    monthly_bill: float = Query(150.0, description="Monthly electric bill"),
+    utility_rate: float = Query(0.14, description="$/kWh"),
+    homeowner_name: str = Query("", description="Homeowner name for proposal header"),
+    rep_name: str = Query("", description="Rep name"),
+    company_name: str = Query("Elevate Solar", description="Company name"),
+):
+    """GET version — returns HTML directly (open in browser to preview)."""
+    if not _proposal_enabled:
+        raise HTTPException(status_code=503, detail="Proposal module unavailable.")
+
+    lead = enrich_lead(address, monthly_bill, utility_rate)
+    if "error" in lead:
+        raise HTTPException(status_code=422, detail=lead["error"])
+
+    html = _render_proposal(lead, homeowner_name=homeowner_name, rep_name=rep_name, company_name=company_name)
+
+    # Save file
+    import re
+    from pathlib import Path
+    from datetime import datetime
+    proposals_dir = Path("/root/solar-tools/cache/proposals")
+    proposals_dir.mkdir(parents=True, exist_ok=True)
+    slug = re.sub(r'[^a-z0-9]+', '_', lead['address'].lower())[:60]
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    out_path = proposals_dir / f"proposal_{slug}_{ts}.html"
+    out_path.write_text(html, encoding="utf-8")
+
+    return HTMLResponse(html)
+
+
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8765)
