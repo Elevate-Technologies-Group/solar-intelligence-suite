@@ -4,6 +4,126 @@ All results cached to disk so re-runs don't burn API quota.
 """
 import os, json, hashlib, time, math, requests
 from typing import Optional
+
+# ─── Supabase sync ────────────────────────────────────────────────────────────
+# Reads SUPABASE_URL and SUPABASE_KEY from environment.
+# Gracefully skips (no-op) if either is not set.
+
+_SUPABASE_URL = None
+_SUPABASE_KEY = None
+_SUPABASE_AVAILABLE = None  # None = not yet checked
+
+
+def _supabase_available() -> bool:
+    """Check once whether Supabase credentials are configured."""
+    global _SUPABASE_AVAILABLE, _SUPABASE_URL, _SUPABASE_KEY
+    if _SUPABASE_AVAILABLE is None:
+        _SUPABASE_URL = os.environ.get("SUPABASE_URL", "").strip()
+        _SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "").strip()
+        _SUPABASE_AVAILABLE = bool(_SUPABASE_URL and _SUPABASE_KEY)
+    return _SUPABASE_AVAILABLE
+
+
+def _parse_imagery_date(d) -> str:
+    """Convert imagery_date dict to ISO string."""
+    if isinstance(d, dict):
+        y = d.get("year")
+        m = d.get("month", 1)
+        return f"{y}-{m:02d}-01" if y else None
+    return str(d) if d else None
+
+
+def sync_lead_to_supabase(lead: dict, raw_address: str = None) -> dict:
+    """
+    Upsert an enriched lead record to Supabase (solar_leads table).
+
+    - Reads SUPABASE_URL and SUPABASE_KEY from env.
+    - Gracefully skips (returns {\"skipped\": True}) if creds not set.
+    - Uses the formatted_address as the natural upsert key.
+    - Returns the Supabase response dict or skip/error info.
+
+    Requires the solar_leads table from integrations/supabase_schema.py.
+    """
+    if not _supabase_available():
+        return {"skipped": True, "reason": "SUPABASE_URL or SUPABASE_KEY not set in environment"}
+
+    if not lead or "error" in lead:
+        return {"skipped": True, "reason": "Lead has errors — not synced"}
+
+    # Build the record to upsert
+    record = {
+        "raw_address": raw_address or lead.get("address", ""),
+        "formatted_address": lead.get("address"),
+        "lat": lead.get("lat"),
+        "lng": lead.get("lng"),
+        "city": lead.get("city"),
+        "state": lead.get("state"),
+        "postal_code": lead.get("postal_code"),
+
+        # Solar potential
+        "sunshine_hours_per_year": lead.get("sunshine_hours_per_year"),
+        "roof_segments": lead.get("roof_segments"),
+        "max_panels_possible": lead.get("max_panels_possible"),
+        "panels_recommended": lead.get("panels_recommended"),
+        "system_size_kw": lead.get("system_size_kw"),
+        "annual_kwh_produced": lead.get("annual_kwh_produced"),
+        "annual_kwh_needed": lead.get("annual_kwh_needed"),
+        "energy_offset_pct": lead.get("offset_pct"),
+        "imagery_quality": lead.get("imagery_quality"),
+
+        # Financials
+        "monthly_bill_usd": lead.get("monthly_bill_usd"),
+        "gross_cost_usd": lead.get("gross_cost_usd"),
+        "federal_itc_usd": lead.get("federal_itc_usd"),
+        "net_cost_usd": lead.get("net_cost_usd"),
+        "annual_savings_yr1_usd": lead.get("annual_savings_yr1_usd"),
+        "lifetime_savings_usd": lead.get("lifetime_savings_usd"),
+        "payback_years": lead.get("payback_years"),
+        "roi_25yr_pct": lead.get("roi_25yr_pct"),
+        "co2_offset_lbs_per_year": lead.get("co2_offset_lbs_per_year"),
+
+        # Lead scoring
+        "lead_score": lead.get("lead_score"),
+        "lead_grade": lead.get("lead_grade"),
+        "priority": lead.get("priority"),
+        "score_breakdown": json.dumps(lead.get("score_breakdown", {})),
+
+        # Talking points & raw data
+        "talking_points": json.dumps(lead.get("talking_points", [])),
+    }
+
+    # Remove None values (let Supabase use column defaults)
+    record = {k: v for k, v in record.items() if v is not None}
+
+    headers = {
+        "apikey": _SUPABASE_KEY,
+        "Authorization": f"Bearer {_SUPABASE_KEY}",
+        "Content-Type": "application/json",
+        "Prefer": "return=representation,resolution=merge-duplicates",
+    }
+
+    url = f"{_SUPABASE_URL}/rest/v1/solar_leads"
+
+    try:
+        resp = requests.post(
+            url,
+            headers=headers,
+            json=record,
+            timeout=15,
+            params={"on_conflict": "formatted_address"},  # upsert on address
+        )
+        if resp.status_code in (200, 201):
+            data = resp.json()
+            lead_id = data[0].get("id") if isinstance(data, list) and data else None
+            return {"synced": True, "id": lead_id, "status_code": resp.status_code}
+        else:
+            return {
+                "synced": False,
+                "status_code": resp.status_code,
+                "error": resp.text[:500],
+            }
+    except Exception as e:
+        return {"synced": False, "error": str(e)}
 from core.config import (
     GOOGLE_MAPS_API_KEY, SOLAR_BASE, MAPS_BASE, CACHE_DIR,
     DEFAULT_PANEL_COST_USD, DEFAULT_UTILITY_RATE_KWH,
