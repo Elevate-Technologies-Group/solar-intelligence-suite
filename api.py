@@ -25,6 +25,13 @@ try:
 except Exception:
     _canvass_enabled = False
 
+# Follow-up sequence generator import (optional — graceful if missing)
+try:
+    from scripts.generate_followup import generate_sequence as _gen_followup_seq, save_txt as _save_followup_txt
+    _followup_enabled = True
+except Exception:
+    _followup_enabled = False
+
 try:
     from integrations.discord_alerts import notify_hot_lead, notify_batch_results, notify_territory_scan
     _discord_enabled = True
@@ -647,6 +654,112 @@ async def generate_proposal_get(
     out_path.write_text(html, encoding="utf-8")
 
     return HTMLResponse(html)
+
+
+class FollowupRequest(BaseModel):
+    address: str
+    monthly_bill: float = 175.0
+    utility_rate: float = 0.14
+    homeowner_name: str = ""
+    rep_name: str = ""
+    rep_phone: str = ""
+    company_name: str = "Elevate Solar"
+    save_txt: bool = False
+
+
+@app.post("/api/lead/followup")
+async def generate_followup_sequence(req: FollowupRequest):
+    """
+    Generate a personalized 5-touch SMS + email follow-up sequence for a solar lead.
+
+    Enriches the address, then builds a 14-day drip sequence with real data
+    (savings, system size, payback, ITC savings) embedded in every message.
+
+    Returns:
+      - touches: list of 5 touch objects (day, channel, subject, body, notes, cta)
+      - summary: lead snapshot + rep info
+      - lead: full enriched lead data
+
+    Example:
+        POST /api/lead/followup
+        {
+          "address": "1905 E Marquette Dr, Gilbert AZ 85234",
+          "monthly_bill": 195,
+          "homeowner_name": "The Garcia Family",
+          "rep_name": "Jake Torres",
+          "rep_phone": "602-555-0192"
+        }
+    """
+    if not _followup_enabled:
+        raise HTTPException(status_code=503, detail="Follow-up module unavailable. Check scripts/generate_followup.py.")
+
+    lead = enrich_lead(req.address, req.monthly_bill, req.utility_rate)
+    if "error" in lead:
+        raise HTTPException(status_code=422, detail=lead["error"])
+
+    seq = _gen_followup_seq(
+        lead,
+        homeowner_name=req.homeowner_name,
+        rep_name=req.rep_name,
+        rep_phone=req.rep_phone,
+        company_name=req.company_name,
+    )
+
+    file_path = None
+    if req.save_txt:
+        try:
+            file_path = _save_followup_txt(seq)
+        except Exception as e:
+            file_path = f"error: {e}"
+
+    return {
+        "touches": seq["touches"],
+        "summary": seq["summary"],
+        "lead": seq["lead"],
+        "file_path": file_path,
+    }
+
+
+@app.get("/api/lead/followup")
+async def generate_followup_get(
+    address: str = Query(..., description="Full street address"),
+    monthly_bill: float = Query(175.0, description="Monthly electric bill"),
+    utility_rate: float = Query(0.14, description="$/kWh"),
+    homeowner_name: str = Query("", description="Homeowner name"),
+    rep_name: str = Query("", description="Rep name"),
+    rep_phone: str = Query("", description="Rep phone"),
+    company_name: str = Query("Elevate Solar", description="Company name"),
+    save_txt: bool = Query(False, description="Save plain-text copy to cache/followup/"),
+):
+    """GET version of follow-up sequence generator (query params)."""
+    if not _followup_enabled:
+        raise HTTPException(status_code=503, detail="Follow-up module unavailable.")
+
+    lead = enrich_lead(address, monthly_bill, utility_rate)
+    if "error" in lead:
+        raise HTTPException(status_code=422, detail=lead["error"])
+
+    seq = _gen_followup_seq(
+        lead,
+        homeowner_name=homeowner_name,
+        rep_name=rep_name,
+        rep_phone=rep_phone,
+        company_name=company_name,
+    )
+
+    file_path = None
+    if save_txt:
+        try:
+            file_path = _save_followup_txt(seq)
+        except Exception as e:
+            file_path = f"error: {e}"
+
+    return {
+        "touches": seq["touches"],
+        "summary": seq["summary"],
+        "lead": seq["lead"],
+        "file_path": file_path,
+    }
 
 
 if __name__ == "__main__":

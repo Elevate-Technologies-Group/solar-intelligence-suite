@@ -152,6 +152,7 @@
     <div class="tab" onclick="switchTab('proposal')">📄 Proposal Builder</div>
     <div class="tab" onclick="switchTab('canvass')">🚪 Canvass Route</div>
     <div class="tab" onclick="switchTab('history')" id="history-tab">📋 Lead History</div>
+    <div class="tab" onclick="switchTab('followup')">💬 Follow-Up Sequences</div>
     <div class="tab" onclick="switchTab('about')">📖 How It Works</div>
   </div>
 
@@ -409,6 +410,77 @@
     <div id="history-territory-leaderboard" style="margin-top:20px;"></div>
   </div>
 
+  <!-- FOLLOW-UP SEQUENCE PANEL -->
+  <div id="tab-followup" class="panel">
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title"><span>💬</span> Generate Follow-Up Sequence</div>
+        <div class="form-group">
+          <label>Property Address</label>
+          <input type="text" id="fu-address" placeholder="1905 E Marquette Dr, Gilbert AZ 85234" />
+        </div>
+        <div class="input-row">
+          <div class="form-group">
+            <label>Monthly Bill ($)</label>
+            <input type="number" id="fu-bill" value="175" min="50" max="1000" />
+          </div>
+          <div class="form-group">
+            <label>Utility Rate ($/kWh)</label>
+            <input type="number" id="fu-rate" value="0.14" min="0.08" max="0.40" step="0.01" />
+          </div>
+        </div>
+        <div class="input-row">
+          <div class="form-group">
+            <label>Homeowner Name</label>
+            <input type="text" id="fu-name" placeholder="The Garcia Family" />
+          </div>
+          <div class="form-group">
+            <label>Rep Name</label>
+            <input type="text" id="fu-rep" placeholder="Jake Torres" />
+          </div>
+        </div>
+        <div class="input-row">
+          <div class="form-group">
+            <label>Rep Phone</label>
+            <input type="text" id="fu-phone" placeholder="602-555-0192" />
+          </div>
+          <div class="form-group">
+            <label>Company Name</label>
+            <input type="text" id="fu-company" value="Elevate Solar" />
+          </div>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:8px;">
+          <button class="btn btn-primary" onclick="generateFollowup()" id="fu-btn">💬 Build Sequence</button>
+          <button class="btn" onclick="saveFollowupTxt()" id="fu-save-btn" style="display:none;">💾 Save .txt</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title"><span>📋</span> How It Works</div>
+        <div style="font-size:13px;color:var(--muted);line-height:1.9;">
+          <p><strong style="color:var(--accent)">1. Enrich</strong> — Address → full solar analysis (Google Solar API)</p>
+          <p><strong style="color:var(--accent)">2. Personalize</strong> — Real savings, system size, payback embedded in every message</p>
+          <p><strong style="color:var(--accent)">3. 5 Touches</strong> — SMS → Email → SMS → Email → SMS over 14 days</p>
+          <p><strong style="color:var(--accent)">4. Data-first</strong> — Every touch references their actual numbers</p>
+          <p><strong style="color:var(--accent)">5. ITC reminder</strong> — Federal tax credit included in key messages</p>
+          <p><strong style="color:var(--accent)">6. Soft close</strong> — Final touch gives easy opt-out to nurture list</p>
+        </div>
+        <div style="margin-top:16px;padding:12px;background:var(--surface2);border-radius:8px;font-size:12px;color:var(--muted);">
+          <strong style="color:var(--accent);">Pro Tip:</strong> Use immediately after a door knock — Touch 1 goes out same day while the homeowner still remembers you.
+        </div>
+        <div style="margin-top:12px;font-size:12px;color:var(--muted);">
+          <p>📡 <code style="color:var(--accent)">POST /api/lead/followup</code></p>
+          <p>📡 <code style="color:var(--accent)">GET /api/lead/followup?address=...</code></p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Lead snapshot -->
+    <div id="fu-lead-snapshot" style="display:none;margin-top:16px;"></div>
+
+    <!-- Touches -->
+    <div id="fu-touches" style="margin-top:16px;"></div>
+  </div>
+
   <!-- ABOUT PANEL -->
   <div id="tab-about" class="panel">
     <div class="grid-2">
@@ -442,6 +514,7 @@
           <p><span style="color:var(--green)">POST</span> <span style="color:var(--accent)">/api/territory/compare</span> — Compare multiple zip codes</p>
           <p><span style="color:var(--green)">GET</span> <span style="color:var(--accent)">/api/lead/proposal</span> — Generate full HTML proposal</p>
           <p><span style="color:var(--green)">POST</span> <span style="color:var(--accent)">/api/lead/canvass</span> — Door-knock route optimizer (🚪 Canvass tab)</p>
+          <p><span style="color:var(--green)">POST/GET</span> <span style="color:var(--accent)">/api/lead/followup</span> — 5-touch SMS+email sequence generator (💬 Follow-Up tab)</p>
           <p><span style="color:var(--green)">GET</span> <span style="color:var(--accent)">/api/stats</span> — Aggregate pipeline stats from cache</p>
           <p><span style="color:var(--green)">GET</span> <span style="color:var(--accent)">/api/leads/history</span> — All enriched leads, filterable</p>
           <p><span style="color:var(--green)">GET</span> <span style="color:var(--accent)">/api/territory/cached</span> — List previous scans</p>
@@ -610,6 +683,187 @@ function switchTab(name) {
     const ca = document.getElementById('canvass-address');
     if (!ca.value) ca.value = '1905 E Marquette Dr, Gilbert, AZ 85234';
   }
+}
+
+// ── Follow-Up Sequence ────────────────────────────────────────────────────────
+
+let _fuLastSeq = null;
+
+const FU_CHANNEL_COLORS = { SMS: '#3b82f6', Email: '#a855f7' };
+const FU_CHANNEL_ICONS  = { SMS: '💬', Email: '📧' };
+
+async function generateFollowup() {
+  const addr = document.getElementById('fu-address').value.trim();
+  if (!addr) { alert('Please enter an address'); return; }
+
+  const btn = document.getElementById('fu-btn');
+  btn.disabled = true; btn.textContent = '⏳ Generating…';
+
+  const snap = document.getElementById('fu-lead-snapshot');
+  const touchesEl = document.getElementById('fu-touches');
+  snap.style.display = 'none';
+  touchesEl.innerHTML = '';
+
+  try {
+    const resp = await fetch('/api/lead/followup', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        address: addr,
+        monthly_bill: parseFloat(document.getElementById('fu-bill').value) || 175,
+        utility_rate: parseFloat(document.getElementById('fu-rate').value) || 0.14,
+        homeowner_name: document.getElementById('fu-name').value.trim(),
+        rep_name: document.getElementById('fu-rep').value.trim(),
+        rep_phone: document.getElementById('fu-phone').value.trim(),
+        company_name: document.getElementById('fu-company').value.trim() || 'Elevate Solar',
+      })
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.detail || 'API error');
+
+    _fuLastSeq = data;
+    renderFollowupResults(data);
+    document.getElementById('fu-save-btn').style.display = 'inline-block';
+  } catch(e) {
+    touchesEl.innerHTML = `<div class="card" style="color:#f87171;">❌ Error: ${e.message}</div>`;
+  } finally {
+    btn.disabled = false; btn.textContent = '💬 Build Sequence';
+  }
+}
+
+function renderFollowupResults(data) {
+  const summary = data.summary;
+  const lead = data.lead;
+  const touches = data.touches;
+
+  const pColor = {'HOT':'#ef4444','WARM':'#f59e0b','COOL':'#38bdf8','LOW':'#6b7280'}[summary.priority] || '#6b7280';
+
+  // Lead snapshot
+  const snap = document.getElementById('fu-lead-snapshot');
+  snap.style.display = 'block';
+  snap.innerHTML = `
+    <div class="card" style="border-left: 4px solid ${pColor};">
+      <div class="card-title"><span>📊</span> Lead Snapshot — ${summary.address}</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-top:8px;">
+        <div style="text-align:center;">
+          <div style="font-size:28px;font-weight:700;color:${pColor};">${summary.lead_score}</div>
+          <div style="font-size:11px;color:var(--muted);">Lead Score / 100</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="font-size:22px;font-weight:700;color:var(--green);">$${summary.annual_savings_usd.toLocaleString()}</div>
+          <div style="font-size:11px;color:var(--muted);">Year-1 Savings</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="font-size:22px;font-weight:700;color:var(--green);">$${summary.monthly_savings_usd}/mo</div>
+          <div style="font-size:11px;color:var(--muted);">Monthly Savings</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="font-size:22px;font-weight:700;color:var(--text);">$${summary.net_cost_usd.toLocaleString()}</div>
+          <div style="font-size:11px;color:var(--muted);">Net Cost (after ITC)</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="font-size:22px;font-weight:700;color:var(--text);">${summary.payback_years} yrs</div>
+          <div style="font-size:11px;color:var(--muted);">Payback Period</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="font-size:22px;font-weight:700;color:var(--accent);">${summary.roi_25yr_pct}%</div>
+          <div style="font-size:11px;color:var(--muted);">25-yr ROI</div>
+        </div>
+      </div>
+      ${summary.rep_name ? `<div style="margin-top:10px;font-size:12px;color:var(--muted);">Rep: <strong style="color:var(--text)">${summary.rep_name}</strong>${summary.rep_phone ? ' · '+summary.rep_phone : ''} | ${summary.company_name}</div>` : ''}
+    </div>`;
+
+  // Touch cards
+  const touchesEl = document.getElementById('fu-touches');
+  let html = `<div class="card-title" style="margin-bottom:12px;font-size:16px;"><span>📅</span> 5-Touch Sequence  <span style="font-size:12px;color:var(--muted);font-weight:400;">— 14 days · SMS ×3 · Email ×2</span></div>`;
+
+  touches.forEach(touch => {
+    const ch = touch.channel;
+    const chColor = FU_CHANNEL_COLORS[ch] || '#6b7280';
+    const chIcon = FU_CHANNEL_ICONS[ch] || '📨';
+    const dayLabel = touch.day === 0 ? 'Day 0 — Today' : `Day ${touch.day}`;
+    const bodyHtml = touch.body.replace(/\n/g, '<br>');
+
+    html += `
+      <div class="card" style="margin-bottom:16px;border-left:4px solid ${chColor};">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <div>
+            <span style="font-weight:700;font-size:15px;color:${chColor};">${chIcon} Touch ${touch.touch} — ${ch}</span>
+            <span style="margin-left:12px;font-size:12px;color:var(--muted);">${dayLabel} (${touch.day_label})</span>
+          </div>
+          <button class="btn" style="font-size:11px;padding:4px 10px;" onclick="copyToClipboard('fu-body-${touch.touch}')">📋 Copy</button>
+        </div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">⏰ ${touch.timing}</div>
+        ${touch.subject ? `<div style="margin-bottom:8px;padding:6px 10px;background:var(--surface2);border-radius:6px;font-size:13px;"><strong>Subject:</strong> ${touch.subject}</div>` : ''}
+        <div id="fu-body-${touch.touch}" style="background:var(--surface2);border-radius:8px;padding:14px;font-size:13px;line-height:1.7;color:var(--text);white-space:pre-wrap;font-family:monospace;">${touch.body}</div>
+        <div style="margin-top:10px;padding:8px 10px;background:var(--bg);border-radius:6px;font-size:12px;color:var(--muted);">
+          <strong style="color:var(--text);">📋 Notes:</strong> ${touch.notes}
+        </div>
+        <div style="margin-top:6px;font-size:12px;color:var(--accent);"><strong>CTA:</strong> ${touch.cta}</div>
+      </div>`;
+  });
+  touchesEl.innerHTML = html;
+}
+
+function copyToClipboard(elementId) {
+  const el = document.getElementById(elementId);
+  if (!el) return;
+  navigator.clipboard.writeText(el.textContent).then(() => {
+    const btn = event.target;
+    const orig = btn.textContent;
+    btn.textContent = '✅ Copied!';
+    setTimeout(() => btn.textContent = orig, 1500);
+  }).catch(() => {
+    // Fallback for non-secure contexts
+    const sel = window.getSelection();
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    sel.removeAllRanges();
+    sel.addRange(range);
+    document.execCommand('copy');
+  });
+}
+
+async function saveFollowupTxt() {
+  if (!_fuLastSeq) return;
+  const addr = document.getElementById('fu-address').value.trim();
+  const btn = document.getElementById('fu-save-btn');
+  btn.disabled = true; btn.textContent = '⏳ Saving…';
+  try {
+    const resp = await fetch('/api/lead/followup', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        address: addr,
+        monthly_bill: parseFloat(document.getElementById('fu-bill').value) || 175,
+        utility_rate: parseFloat(document.getElementById('fu-rate').value) || 0.14,
+        homeowner_name: document.getElementById('fu-name').value.trim(),
+        rep_name: document.getElementById('fu-rep').value.trim(),
+        rep_phone: document.getElementById('fu-phone').value.trim(),
+        company_name: document.getElementById('fu-company').value.trim() || 'Elevate Solar',
+        save_txt: true,
+      })
+    });
+    const data = await resp.json();
+    if (data.file_path) {
+      btn.textContent = '✅ Saved!';
+      setTimeout(() => { btn.textContent = '💾 Save .txt'; btn.disabled = false; }, 2000);
+    }
+  } catch(e) {
+    btn.textContent = '❌ Error';
+    setTimeout(() => { btn.textContent = '💾 Save .txt'; btn.disabled = false; }, 2000);
+  }
+}
+
+// Pre-fill Follow-Up from Lead Enrichment result
+function openFollowupForLead(addr, bill) {
+  document.getElementById('fu-address').value = addr;
+  document.getElementById('fu-bill').value = bill || 175;
+  document.querySelectorAll('.tab').forEach(t => {
+    if (t.textContent.includes('Follow-Up')) {
+      t.click();
+    }
+  });
 }
 
 function quickLoad(addr, bill) {
