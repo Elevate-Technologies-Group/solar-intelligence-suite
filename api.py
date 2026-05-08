@@ -18,7 +18,13 @@ import uvicorn
 from core.solar import enrich_lead, geocode_address
 from tools.territory import scan_territory, multi_zip_comparison
 
-# Discord alerts (optional — skips silently if DISCORD_WEBHOOK_URL not set)
+# Canvass tool import (optional — graceful if missing)
+try:
+    from scripts.canvass_neighbors import run_canvass
+    _canvass_enabled = True
+except Exception:
+    _canvass_enabled = False
+
 try:
     from integrations.discord_alerts import notify_hot_lead, notify_batch_results, notify_territory_scan
     _discord_enabled = True
@@ -69,6 +75,16 @@ class BatchLeadRequest(BaseModel):
     monthly_bill: float = 150.0
     utility_rate: float = 0.14
     max_workers: int = 4
+
+
+class CanvassRequest(BaseModel):
+    seed_address: str
+    radius_m: int = 400
+    max_homes: int = 10
+    monthly_bill: float = 175.0
+    utility_rate: float = 0.14
+    neighbor_name: Optional[str] = None
+    hot_only: bool = False
 
 
 # ─── routes ───────────────────────────────────────────────────────────────────
@@ -284,6 +300,53 @@ async def generate_proposal(
         }
     }
     return proposal
+
+
+@app.post("/api/lead/canvass")
+async def canvass_neighborhood(req: CanvassRequest):
+    """
+    Neighborhood canvass tool — find and score homes near a seed address.
+
+    Given a seed address (a new solar install, referral, or target zone),
+    this endpoint:
+      1. Finds up to `max_homes` nearby residential addresses within `radius_m`
+      2. Enriches each with full Solar API data + lead scoring
+      3. Builds an optimized door-knock route (HOT leads first, greedy walk)
+      4. Generates personalized door-knocker talking points for each stop
+      5. Returns the full canvass route sorted for maximum conversion
+
+    The `neighbor_name` field enables social proof messaging in talking points:
+    "Hi! I just helped [neighbor_name] go solar — they're saving $X/month..."
+
+    Example request:
+        {
+          "seed_address": "1234 W Oak St, Chandler, AZ 85224",
+          "radius_m": 400,
+          "max_homes": 8,
+          "monthly_bill": 195,
+          "neighbor_name": "The Garcias"
+        }
+    """
+    if not _canvass_enabled:
+        raise HTTPException(
+            status_code=503,
+            detail="Canvass module not available. Check scripts/canvass_neighbors.py."
+        )
+
+    result = run_canvass(
+        seed_address=req.seed_address,
+        radius_m=min(req.radius_m, 1000),
+        max_homes=min(req.max_homes, 20),
+        monthly_bill=req.monthly_bill,
+        utility_rate=req.utility_rate,
+        neighbor_name=req.neighbor_name,
+        hot_only=req.hot_only,
+    )
+
+    if "error" in result:
+        raise HTTPException(status_code=422, detail=result["error"])
+
+    return result
 
 
 if __name__ == "__main__":
