@@ -135,11 +135,22 @@
 
 <div class="container">
 
+  <!-- Live Stats Bar -->
+  <div id="live-stats-bar" style="display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:20px;">
+    <div class="stat"><div class="stat-value" id="stat-total">—</div><div class="stat-label">Total Leads</div></div>
+    <div class="stat"><div class="stat-value" style="color:var(--hot)" id="stat-hot">—</div><div class="stat-label">🔥 HOT Leads</div></div>
+    <div class="stat"><div class="stat-value" style="color:var(--warm)" id="stat-warm">—</div><div class="stat-label">☀️ WARM Leads</div></div>
+    <div class="stat"><div class="stat-value" id="stat-avgscore">—</div><div class="stat-label">Avg Score</div></div>
+    <div class="stat"><div class="stat-value" style="color:var(--green)" id="stat-pipeline">—</div><div class="stat-label">Pipeline / Yr</div></div>
+    <div class="stat"><div class="stat-value" id="stat-territories">—</div><div class="stat-label">Territories</div></div>
+  </div>
+
   <!-- Tabs -->
   <div class="tabs">
     <div class="tab active" onclick="switchTab('lead')">🎯 Lead Enrichment</div>
     <div class="tab" onclick="switchTab('territory')">🗺️ Territory Scanner</div>
     <div class="tab" onclick="switchTab('proposal')">📄 Proposal Builder</div>
+    <div class="tab" onclick="switchTab('history')" id="history-tab">📋 Lead History</div>
     <div class="tab" onclick="switchTab('about')">📖 How It Works</div>
   </div>
 
@@ -263,6 +274,75 @@
     <div id="proposal-result" style="margin-top:20px;"></div>
   </div>
 
+  <!-- HISTORY PANEL -->
+  <div id="tab-history" class="panel">
+    <div class="card" style="margin-bottom:16px;">
+      <div class="card-title"><span>📋</span> All Enriched Leads — Filter & Search</div>
+      <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr;gap:12px;align-items:end;">
+        <div class="form-group" style="margin:0">
+          <label>Filter by Priority</label>
+          <select id="hist-priority">
+            <option value="">All Priorities</option>
+            <option value="HOT">🔥 HOT</option>
+            <option value="WARM">☀️ WARM</option>
+            <option value="COOL">❄️ COOL</option>
+            <option value="LOW">📉 LOW</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin:0">
+          <label>Zip Code</label>
+          <input type="text" id="hist-zip" placeholder="e.g. 85234" />
+        </div>
+        <div class="form-group" style="margin:0">
+          <label>Min Score</label>
+          <input type="number" id="hist-minscore" placeholder="0" value="0" min="0" max="100" />
+        </div>
+        <div class="form-group" style="margin:0">
+          <label>Sort By</label>
+          <select id="hist-sort">
+            <option value="lead_score">Lead Score ↓</option>
+            <option value="annual_savings_yr1_usd">Annual Savings ↓</option>
+            <option value="payback_years">Payback (fastest)</option>
+            <option value="sunshine_hours_per_year">Sunshine Hours ↓</option>
+          </select>
+        </div>
+        <div>
+          <button class="btn btn-primary" onclick="loadHistory()" style="margin-top:20px">🔄 Refresh</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="history-stats" style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:16px;"></div>
+
+    <div class="card" style="padding:0;">
+      <div id="history-loading" class="loading" style="display:none;"><div class="spinner"></div> Loading leads...</div>
+      <div id="history-empty" class="empty" style="display:none;">No leads found matching your filters.</div>
+      <div id="history-table-wrap" style="overflow-x:auto;">
+        <table class="prospect-table" id="history-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Address</th>
+              <th>Priority</th>
+              <th>Score</th>
+              <th>Yr 1 Savings</th>
+              <th>Payback</th>
+              <th>System</th>
+              <th>Sunshine</th>
+              <th>Roof</th>
+              <th>Imagery</th>
+              <th>ROI</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="history-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="history-territory-leaderboard" style="margin-top:20px;"></div>
+  </div>
+
   <!-- ABOUT PANEL -->
   <div id="tab-about" class="panel">
     <div class="grid-2">
@@ -291,9 +371,13 @@
         <div class="card-title"><span>🔌</span> API Endpoints</div>
         <div style="font-family:monospace;font-size:12px;color:var(--muted);line-height:2.2;">
           <p><span style="color:var(--green)">GET/POST</span> <span style="color:var(--accent)">/api/lead/enrich</span> — Enrich a single address</p>
+          <p><span style="color:var(--green)">POST</span> <span style="color:var(--accent)">/api/lead/batch</span> — Enrich up to 10 addresses in parallel</p>
           <p><span style="color:var(--green)">POST</span> <span style="color:var(--accent)">/api/territory/scan</span> — Scan a zip code territory</p>
           <p><span style="color:var(--green)">POST</span> <span style="color:var(--accent)">/api/territory/compare</span> — Compare multiple zip codes</p>
-          <p><span style="color:var(--green)">GET</span> <span style="color:var(--accent)">/api/proposal/{address}</span> — Generate full proposal</p>
+          <p><span style="color:var(--green)">GET</span> <span style="color:var(--accent)">/api/lead/proposal</span> — Generate full HTML proposal</p>
+          <p><span style="color:var(--green)">POST</span> <span style="color:var(--accent)">/api/lead/canvass</span> — Door-knock route optimizer</p>
+          <p><span style="color:var(--green)">GET</span> <span style="color:var(--accent)">/api/stats</span> — Aggregate pipeline stats from cache</p>
+          <p><span style="color:var(--green)">GET</span> <span style="color:var(--accent)">/api/leads/history</span> — All enriched leads, filterable</p>
           <p><span style="color:var(--green)">GET</span> <span style="color:var(--accent)">/api/territory/cached</span> — List previous scans</p>
           <p><span style="color:var(--green)">GET</span> <span style="color:var(--accent)">/health</span> — Service health check</p>
         </div>
@@ -306,11 +390,155 @@
 <script>
 const API = '';  // Same origin
 
+// ── Live stats bar ─────────────────────────────────────────────────────────
+async function loadLiveStats() {
+  try {
+    const r = await fetch(`${API}/api/stats`);
+    const d = await r.json();
+    document.getElementById('stat-total').textContent = d.total_leads;
+    document.getElementById('stat-hot').textContent = d.hot_leads;
+    document.getElementById('stat-warm').textContent = d.warm_leads;
+    document.getElementById('stat-avgscore').textContent = d.avg_lead_score + '/100';
+    document.getElementById('stat-pipeline').textContent = '$' + d.total_pipeline_yr1_usd.toLocaleString();
+    document.getElementById('stat-territories').textContent = d.territories_scanned;
+    // Update history tab label
+    document.getElementById('history-tab').textContent = `📋 Lead History (${d.total_leads})`;
+    // Store for territory leaderboard
+    window._statsData = d;
+  } catch(e) { /* silent if API not ready */ }
+}
+loadLiveStats();
+setInterval(loadLiveStats, 30000); // refresh every 30s
+
+// ── History panel ──────────────────────────────────────────────────────────
+async function loadHistory() {
+  const priority = document.getElementById('hist-priority').value;
+  const zip = document.getElementById('hist-zip').value.trim();
+  const minScore = parseInt(document.getElementById('hist-minscore').value) || 0;
+  const sort = document.getElementById('hist-sort').value;
+
+  document.getElementById('history-loading').style.display = 'flex';
+  document.getElementById('history-empty').style.display = 'none';
+  document.getElementById('history-tbody').innerHTML = '';
+  document.getElementById('history-stats').innerHTML = '';
+
+  let url = `${API}/api/leads/history?limit=100&sort_by=${sort}`;
+  if (priority) url += `&priority=${priority}`;
+  if (zip) url += `&zip_code=${encodeURIComponent(zip)}`;
+  if (minScore > 0) url += `&min_score=${minScore}`;
+
+  try {
+    const r = await fetch(url);
+    const d = await r.json();
+    document.getElementById('history-loading').style.display = 'none';
+
+    if (!d.leads || d.leads.length === 0) {
+      document.getElementById('history-empty').style.display = 'block';
+      return;
+    }
+
+    // Filter summary stats
+    const leads = d.leads;
+    const hot = leads.filter(l => l.priority === 'HOT').length;
+    const warm = leads.filter(l => l.priority === 'WARM').length;
+    const avgScore = (leads.reduce((s,l) => s + l.lead_score, 0) / leads.length).toFixed(1);
+    const totalSavings = leads.reduce((s,l) => s + l.annual_savings_yr1_usd, 0);
+    const avgPayback = (leads.reduce((s,l) => s + l.payback_years, 0) / leads.length).toFixed(1);
+    document.getElementById('history-stats').innerHTML = `
+      <div class="stat"><div class="stat-value">${leads.length}</div><div class="stat-label">Matching Leads</div></div>
+      <div class="stat"><div class="stat-value" style="color:var(--hot)">${hot}</div><div class="stat-label">🔥 HOT</div></div>
+      <div class="stat"><div class="stat-value" style="color:var(--warm)">${warm}</div><div class="stat-label">☀️ WARM</div></div>
+      <div class="stat"><div class="stat-value">${avgScore}/100</div><div class="stat-label">Avg Score</div></div>
+      <div class="stat"><div class="stat-value" style="color:var(--green)">$${Math.round(totalSavings).toLocaleString()}</div><div class="stat-label">Total Pipeline/Yr</div></div>
+    `;
+
+    // Render table rows
+    const tbody = document.getElementById('history-tbody');
+    leads.forEach((l, i) => {
+      const priClass = l.priority === 'HOT' ? 'badge-HOT' : l.priority === 'WARM' ? 'badge-WARM' : l.priority === 'COOL' ? 'badge-COOL' : 'badge-LOW';
+      const scoreWidth = Math.min(100, l.lead_score);
+      const fillClass = l.priority === 'HOT' ? 'fill-hot' : l.priority === 'WARM' ? 'fill-warm' : 'fill-cool';
+      const imgDate = typeof l.imagery_date === 'object' && l.imagery_date
+        ? (l.imagery_date.year || '?')
+        : (l.imagery_date || '?');
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td style="color:var(--muted);font-size:12px">${i+1}</td>
+        <td>
+          <div style="font-weight:600;font-size:13px">${l.address}</div>
+          <div style="font-size:11px;color:var(--muted)">${l.city}${l.state ? ', '+l.state : ''} ${l.zip_code}</div>
+        </td>
+        <td><span class="badge ${priClass}">${l.priority}</span></td>
+        <td>
+          <div style="font-weight:800;color:var(--accent)">${l.lead_score}</div>
+          <div class="score-bar" style="width:60px;height:4px;margin-top:4px"><div class="score-fill ${fillClass}" style="width:${scoreWidth}%"></div></div>
+        </td>
+        <td style="color:var(--green);font-weight:700">$${Math.round(l.annual_savings_yr1_usd).toLocaleString()}</td>
+        <td>${l.payback_years.toFixed(1)} yrs</td>
+        <td>${l.panels_recommended}p · ${l.system_size_kw}kW</td>
+        <td>${l.sunshine_hours_per_year?.toLocaleString() || '?'} hrs</td>
+        <td>${l.roof_segments} seg</td>
+        <td>${imgDate}</td>
+        <td>${l.roi_25yr_pct?.toFixed(0) || '?'}%</td>
+        <td style="white-space:nowrap">
+          <button onclick="quickLoad('${l.address.replace(/'/g,"\\'")}', 175)" style="background:var(--accent2);border:none;color:#fff;padding:4px 8px;border-radius:6px;font-size:11px;cursor:pointer;margin-right:4px" title="Enrich this lead">⚡</button>
+          <button onclick="openProposalForLead('${l.address.replace(/'/g,"\\'")}', '${l.city || ''}')" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:4px 8px;border-radius:6px;font-size:11px;cursor:pointer" title="Generate proposal">📄</button>
+        </td>
+      `;
+      tbody.appendChild(row);
+    });
+
+    // Territory leaderboard
+    if (window._statsData && window._statsData.territories && !priority && !zip) {
+      const terr = window._statsData.territories.filter(t => t.avg_lead_score > 0);
+      if (terr.length > 0) {
+        const medals = ['🥇','🥈','🥉'];
+        let rows = terr.map((t,i) => `
+          <tr>
+            <td>${medals[i] || (i+1)}</td>
+            <td style="font-weight:700">${t.zip_code}</td>
+            <td><span class="badge badge-${t.territory_grade === 'HOT' ? 'HOT' : t.territory_grade === 'WARM' ? 'WARM' : 'COOL'}">${t.territory_grade}</span></td>
+            <td>${t.avg_lead_score.toFixed(1)}</td>
+            <td style="color:var(--hot)">${t.hot_leads}</td>
+            <td>${t.leads_enriched}</td>
+            <td style="color:var(--green)">$${Math.round(t.avg_annual_savings_usd).toLocaleString()}/yr</td>
+          </tr>
+        `).join('');
+        document.getElementById('history-territory-leaderboard').innerHTML = `
+          <div class="card">
+            <div class="card-title"><span>🏆</span> Territory Leaderboard</div>
+            <table class="prospect-table">
+              <thead><tr><th>Rank</th><th>Zip</th><th>Grade</th><th>Avg Score</th><th>HOT Leads</th><th>Total Scanned</th><th>Avg Savings</th></tr></thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>
+        `;
+      }
+    }
+  } catch(e) {
+    document.getElementById('history-loading').style.display = 'none';
+    document.getElementById('history-empty').style.display = 'block';
+    document.getElementById('history-empty').textContent = '❌ Failed to load leads: ' + e.message;
+  }
+}
+
+function openProposalForLead(address, city) {
+  document.getElementById('prop-address').value = address;
+  // switch to proposal tab
+  document.querySelectorAll('.tab').forEach((t,i) => {
+    t.classList.remove('active');
+    if (t.textContent.includes('Proposal')) t.classList.add('active');
+  });
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab-proposal').classList.add('active');
+}
+
 function switchTab(name) {
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
   event.target.classList.add('active');
   document.getElementById('tab-' + name).classList.add('active');
+  if (name === 'history') loadHistory();
 }
 
 function quickLoad(addr, bill) {

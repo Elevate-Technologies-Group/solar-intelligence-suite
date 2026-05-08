@@ -227,6 +227,183 @@ async def batch_lead_enrich(req: BatchLeadRequest):
     }
 
 
+@app.get("/api/stats")
+async def get_stats():
+    """Aggregate stats across all cached territory data and enriched leads."""
+    import glob
+    cache_dir = "/root/solar-tools/cache"
+    all_leads = []
+    territories = []
+
+    for f in os.listdir(cache_dir):
+        if f.startswith("territory_") and f.endswith(".json") and "compare" not in f:
+            fpath = os.path.join(cache_dir, f)
+            try:
+                with open(fpath) as fp:
+                    data = json.load(fp)
+                territories.append(data)
+                prospects = data.get("prospects", [])
+                for p in prospects:
+                    p["_zip"] = data.get("zip_code", "")
+                    p["_city"] = data.get("city", "")
+                all_leads.extend(prospects)
+            except Exception:
+                pass
+
+    # Deduplicate by address
+    seen = set()
+    unique_leads = []
+    for lead in all_leads:
+        key = lead.get("address", "").lower().strip()
+        if key and key not in seen:
+            seen.add(key)
+            unique_leads.append(lead)
+
+    total = len(unique_leads)
+    hot = sum(1 for l in unique_leads if l.get("priority") == "HOT")
+    warm = sum(1 for l in unique_leads if l.get("priority") == "WARM")
+    cool = sum(1 for l in unique_leads if l.get("priority") == "COOL")
+    low = sum(1 for l in unique_leads if l.get("priority") == "LOW")
+    avg_score = round(sum(l.get("lead_score", 0) for l in unique_leads) / max(1, total), 1)
+    total_pipeline = round(sum(l.get("annual_savings_yr1_usd", 0) for l in unique_leads))
+    avg_savings = round(total_pipeline / max(1, total))
+    avg_payback = round(sum(l.get("payback_years", 0) for l in unique_leads) / max(1, total), 1)
+
+    territory_list = []
+    for t in territories:
+        territory_list.append({
+            "zip_code": t.get("zip_code"),
+            "territory_grade": t.get("territory_grade", "?"),
+            "avg_lead_score": t.get("avg_lead_score", 0),
+            "hot_leads": t.get("hot_leads", 0),
+            "leads_enriched": t.get("leads_enriched", 0),
+            "avg_annual_savings_usd": t.get("avg_annual_savings_usd", 0),
+        })
+    territory_list.sort(key=lambda x: x["avg_lead_score"], reverse=True)
+
+    top_leads = sorted(unique_leads, key=lambda x: x.get("lead_score", 0), reverse=True)[:5]
+    top_leads_clean = [{
+        "address": l.get("address", ""),
+        "lead_score": l.get("lead_score", 0),
+        "lead_grade": l.get("lead_grade", "?"),
+        "priority": l.get("priority", "?"),
+        "annual_savings_yr1_usd": l.get("annual_savings_yr1_usd", 0),
+        "payback_years": l.get("payback_years", 0),
+        "panels_recommended": l.get("panels_recommended", 0),
+        "sunshine_hours_per_year": l.get("sunshine_hours_per_year", 0),
+    } for l in top_leads]
+
+    return {
+        "total_leads": total,
+        "hot_leads": hot,
+        "warm_leads": warm,
+        "cool_leads": cool,
+        "low_leads": low,
+        "avg_lead_score": avg_score,
+        "total_pipeline_yr1_usd": total_pipeline,
+        "avg_annual_savings_usd": avg_savings,
+        "avg_payback_years": avg_payback,
+        "territories_scanned": len(territories),
+        "territories": territory_list,
+        "top_leads": top_leads_clean,
+    }
+
+
+@app.get("/api/leads/history")
+async def get_leads_history(
+    priority: str = Query("", description="Filter by HOT/WARM/COOL/LOW"),
+    zip_code: str = Query("", description="Filter by zip code"),
+    min_score: int = Query(0, description="Minimum lead score"),
+    limit: int = Query(50, description="Max results"),
+    sort_by: str = Query("lead_score", description="Sort field"),
+):
+    """Return all enriched leads from cache, optionally filtered."""
+    cache_dir = "/root/solar-tools/cache"
+    all_leads = []
+
+    for f in os.listdir(cache_dir):
+        if f.startswith("territory_") and f.endswith(".json") and "compare" not in f:
+            fpath = os.path.join(cache_dir, f)
+            try:
+                with open(fpath) as fp:
+                    data = json.load(fp)
+                zip_val = data.get("zip_code", "")
+                city_val = data.get("city", "")
+                for p in data.get("prospects", []):
+                    p["_zip"] = zip_val
+                    p["_city"] = city_val
+                    all_leads.append(p)
+            except Exception:
+                pass
+
+    # Also check canvass files
+    for f in os.listdir(cache_dir):
+        if f.startswith("canvass_") and f.endswith(".json"):
+            fpath = os.path.join(cache_dir, f)
+            try:
+                with open(fpath) as fp:
+                    data = json.load(fp)
+                for stop in data.get("canvass_stops", []):
+                    lead = stop.get("lead", {})
+                    if lead and "lead_score" in lead:
+                        lead["_zip"] = lead.get("postal_code", "")
+                        lead["_city"] = lead.get("city", "")
+                        all_leads.append(lead)
+            except Exception:
+                pass
+
+    # Deduplicate
+    seen = set()
+    unique = []
+    for lead in all_leads:
+        key = lead.get("address", lead.get("formatted_address", "")).lower().strip()
+        if key and key not in seen:
+            seen.add(key)
+            unique.append(lead)
+
+    # Filter
+    if priority:
+        unique = [l for l in unique if l.get("priority", "").upper() == priority.upper()]
+    if zip_code:
+        unique = [l for l in unique if l.get("_zip", "") == zip_code or l.get("postal_code", "") == zip_code]
+    if min_score > 0:
+        unique = [l for l in unique if l.get("lead_score", 0) >= min_score]
+
+    # Sort
+    reverse = True
+    if sort_by == "payback_years":
+        reverse = False
+    unique.sort(key=lambda x: x.get(sort_by, 0), reverse=reverse)
+
+    # Clean for response
+    results = []
+    for l in unique[:limit]:
+        results.append({
+            "address": l.get("address", l.get("formatted_address", "")),
+            "city": l.get("city", l.get("_city", "")),
+            "state": l.get("state", ""),
+            "zip_code": l.get("postal_code", l.get("_zip", "")),
+            "lead_score": l.get("lead_score", 0),
+            "lead_grade": l.get("lead_grade", "?"),
+            "priority": l.get("priority", "?"),
+            "annual_savings_yr1_usd": l.get("annual_savings_yr1_usd", 0),
+            "lifetime_savings_usd": l.get("lifetime_savings_usd", 0),
+            "payback_years": l.get("payback_years", 0),
+            "panels_recommended": l.get("panels_recommended", 0),
+            "system_size_kw": l.get("system_size_kw", 0),
+            "sunshine_hours_per_year": l.get("sunshine_hours_per_year", 0),
+            "roof_segments": l.get("roof_segments", 0),
+            "imagery_date": l.get("imagery_date", ""),
+            "net_cost_usd": l.get("net_cost_usd", 0),
+            "roi_25yr_pct": l.get("roi_25yr_pct", 0),
+        })
+
+    return {
+        "total": len(results),
+        "leads": results,
+    }
+
+
 @app.get("/api/territory/cached")
 async def list_cached_scans():
     """List all previously scanned territories."""
