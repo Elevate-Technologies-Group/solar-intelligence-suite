@@ -316,7 +316,8 @@ def enrich_lead(address: str, monthly_bill: float = 150.0, utility_rate: float =
     )
 
     # Step 5: Lead scoring (0-100)
-    score = _score_lead(sp, fin, monthly_bill)
+    imagery_date = insights.get("imageryDate", {})
+    score = _score_lead(sp, fin, monthly_bill, imagery_date=imagery_date)
 
     roof_segments = sp.get("roofSegmentStats", [])
     best_segment = max(roof_segments, key=lambda s: s.get("stats", {}).get("sunshineQuantiles", [0])[-1], default={}) if roof_segments else {}
@@ -356,48 +357,101 @@ def enrich_lead(address: str, monthly_bill: float = 150.0, utility_rate: float =
     }
 
 
-def _score_lead(sp: dict, fin: dict, monthly_bill: float) -> dict:
-    """Score a lead 0-100 based on solar potential and financial fit."""
+def _score_lead(sp: dict, fin: dict, monthly_bill: float, imagery_date: dict = None) -> dict:
+    """
+    Score a lead 0-100 based on solar potential and financial fit.
+
+    Scoring breakdown (max 100 base pts + up to +5 bonus, -15 penalties):
+      sunshine       : 0-25 pts  — annual sunshine hours at location
+      roof_quality   : 0-15 pts  — roof segment count (more usable faces = better)
+      monthly_bill   : 0-30 pts  — higher bill = stronger financial motivation
+      payback        : 0-20 pts  — faster payback = hotter lead
+      roi            : 0-10 pts  — 25-yr ROI quality
+      imagery_bonus  : 0-+5 pts  — newer imagery = higher data quality confidence
+      shading_penalty: 0 to -15  — many segments per panel = fragmented/shaded roof
+    """
     breakdown = {}
 
-    # Sunshine hours (max 25 pts)
+    # ── Sunshine hours (max 25 pts) ─────────────────────────────────────────
     sunshine = sp.get("maxSunshineHoursPerYear", 0)
     sun_score = min(25, int(sunshine / 80))
     breakdown["sunshine"] = sun_score
 
-    # Roof segments / complexity (max 15 pts)
+    # ── Roof quality / segments (max 15 pts) ───────────────────────────────
+    # More distinct roof segments = more faces available = more install options
     segments = len(sp.get("roofSegmentStats", []))
-    seg_score = 15 if segments >= 3 else (10 if segments == 2 else 5)
+    if segments >= 5:    seg_score = 15
+    elif segments >= 3:  seg_score = 12
+    elif segments == 2:  seg_score = 8
+    elif segments == 1:  seg_score = 5
+    else:                seg_score = 0
     breakdown["roof_quality"] = seg_score
 
-    # Monthly bill (max 30 pts — higher bill = better prospect)
-    if monthly_bill >= 300: bill_score = 30
+    # ── Monthly bill (max 30 pts) ────────────────────────────────────────────
+    if monthly_bill >= 300:   bill_score = 30
     elif monthly_bill >= 200: bill_score = 25
     elif monthly_bill >= 150: bill_score = 20
     elif monthly_bill >= 100: bill_score = 12
-    else: bill_score = 5
+    else:                     bill_score = 5
     breakdown["monthly_bill"] = bill_score
 
-    # Payback period (max 20 pts)
+    # ── Payback period (max 20 pts) ──────────────────────────────────────────
     payback = fin.get("payback_years", 99)
-    if payback <= 6: pay_score = 20
-    elif payback <= 8: pay_score = 16
+    if payback <= 6:    pay_score = 20
+    elif payback <= 8:  pay_score = 16
     elif payback <= 10: pay_score = 12
     elif payback <= 12: pay_score = 8
-    else: pay_score = 3
+    else:               pay_score = 3
     breakdown["payback"] = pay_score
 
-    # ROI (max 10 pts)
+    # ── ROI (max 10 pts) ─────────────────────────────────────────────────────
     roi = fin.get("roi_25yr_pct", 0)
     roi_score = min(10, int(roi / 30))
     breakdown["roi"] = roi_score
 
-    total = sum(breakdown.values())
-    if total >= 80: grade, priority = "A+", "HOT"
-    elif total >= 65: grade, priority = "A", "HOT"
-    elif total >= 50: grade, priority = "B", "WARM"
-    elif total >= 35: grade, priority = "C", "COOL"
-    else: grade, priority = "D", "LOW"
+    # ── NEW: Roof age / imagery recency bonus (max +5 pts) ──────────────────
+    # Newer imagery → fresher data → higher confidence in roof condition.
+    # Older imagery may mean the roof is aging or data is stale.
+    imagery_year = None
+    if isinstance(imagery_date, dict):
+        imagery_year = imagery_date.get("year")
+    if imagery_year:
+        current_year = 2026  # Updated for runtime year
+        age_years = current_year - imagery_year
+        if age_years <= 1:    imagery_bonus = 5   # imagery within last year
+        elif age_years <= 2:  imagery_bonus = 4   # 1-2 years old
+        elif age_years <= 4:  imagery_bonus = 3   # 2-4 years old
+        elif age_years <= 6:  imagery_bonus = 1   # 4-6 years old
+        else:                 imagery_bonus = 0   # 6+ year old imagery
+    else:
+        imagery_bonus = 2  # Unknown date — neutral small boost (data exists)
+    breakdown["imagery_bonus"] = imagery_bonus
+
+    # ── NEW: Shading penalty (0 to -15 pts) ──────────────────────────────────
+    # Ratio of roof segments to recommended panels: high ratio = fragmented/shaded roof.
+    # Many small segments with few installable panels indicates complex shading geometry.
+    panels_recommended = fin.get("system_size_kw", 0) / (sp.get("panelCapacityWatts", 400) / 1000) if sp.get("panelCapacityWatts") else 0
+    max_panels = sp.get("maxArrayPanelsCount", 0)
+    shading_penalty = 0
+    if segments > 0 and panels_recommended > 0:
+        seg_per_panel = segments / panels_recommended
+        if seg_per_panel > 0.7:    shading_penalty = -15  # Very fragmented — severe shading risk
+        elif seg_per_panel > 0.5:  shading_penalty = -10  # Moderate fragmentation
+        elif seg_per_panel > 0.35: shading_penalty = -5   # Mild complexity
+        else:                      shading_penalty = 0    # Good panel-to-segment ratio
+    if max_panels > 0 and panels_recommended > 0:
+        # Secondary check: utilization of roof capacity
+        utilization = panels_recommended / max_panels
+        if utilization < 0.15:  # Using <15% of roof capacity is suspicious
+            shading_penalty = min(shading_penalty, -8)
+    breakdown["shading_penalty"] = shading_penalty
+
+    total = max(0, sum(breakdown.values()))  # Floor at 0
+    if total >= 82:   grade, priority = "A+", "HOT"
+    elif total >= 68: grade, priority = "A",  "HOT"
+    elif total >= 52: grade, priority = "B",  "WARM"
+    elif total >= 37: grade, priority = "C",  "COOL"
+    else:             grade, priority = "D",  "LOW"
 
     return {"total": total, "breakdown": breakdown, "grade": grade, "priority": priority}
 
