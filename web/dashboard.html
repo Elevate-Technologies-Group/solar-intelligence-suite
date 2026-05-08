@@ -150,6 +150,7 @@
     <div class="tab active" onclick="switchTab('lead')">🎯 Lead Enrichment</div>
     <div class="tab" onclick="switchTab('territory')">🗺️ Territory Scanner</div>
     <div class="tab" onclick="switchTab('proposal')">📄 Proposal Builder</div>
+    <div class="tab" onclick="switchTab('canvass')">🚪 Canvass Route</div>
     <div class="tab" onclick="switchTab('history')" id="history-tab">📋 Lead History</div>
     <div class="tab" onclick="switchTab('about')">📖 How It Works</div>
   </div>
@@ -274,6 +275,71 @@
     <div id="proposal-result" style="margin-top:20px;"></div>
   </div>
 
+  <!-- CANVASS ROUTE PANEL -->
+  <div id="tab-canvass" class="panel">
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title"><span>🚪</span> Door-Knock Route Builder</div>
+        <div class="form-group">
+          <label>Seed Address <span style="color:var(--muted);font-size:11px">(recent install, referral, or target home)</span></label>
+          <input type="text" id="canvass-address" placeholder="1905 E Marquette Dr, Gilbert, AZ 85234" />
+        </div>
+        <div class="input-row">
+          <div class="form-group">
+            <label>Search Radius (meters)</label>
+            <select id="canvass-radius">
+              <option value="200">200m — tight block</option>
+              <option value="400" selected>400m — neighborhood</option>
+              <option value="600">600m — wider zone</option>
+              <option value="800">800m — large area</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Max Homes to Analyze</label>
+            <select id="canvass-homes">
+              <option value="5">5 homes (fast)</option>
+              <option value="8" selected>8 homes</option>
+              <option value="10">10 homes</option>
+              <option value="15">15 homes (slow)</option>
+            </select>
+          </div>
+        </div>
+        <div class="input-row">
+          <div class="form-group">
+            <label>Avg Monthly Bill ($)</label>
+            <input type="number" id="canvass-bill" value="175" min="50" max="1000" />
+          </div>
+          <div class="form-group">
+            <label>Neighbor Name <span style="color:var(--muted);font-size:11px">(for social proof)</span></label>
+            <input type="text" id="canvass-neighbor" placeholder="The Garcias" />
+          </div>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;">
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+            <input type="checkbox" id="canvass-hotonly" style="accent-color:var(--accent)"> 🔥 HOT/WARM leads only
+          </label>
+        </div>
+        <button class="btn btn-primary" onclick="runCanvass()" id="canvass-btn">🚪 Build Door-Knock Route</button>
+        <div id="canvass-error"></div>
+      </div>
+      <div class="card">
+        <div class="card-title"><span>📍</span> How Canvass Routing Works</div>
+        <ul style="list-style:none;display:flex;flex-direction:column;gap:10px;font-size:13px;color:var(--muted)">
+          <li>🏠 <strong style="color:var(--text)">Finds nearby homes</strong> within your chosen radius via Google Places</li>
+          <li>⚡ <strong style="color:var(--text)">Enriches all homes</strong> in parallel with full Google Solar API data</li>
+          <li>🏆 <strong style="color:var(--text)">HOT leads first</strong> — route starts with the highest-value stops</li>
+          <li>🗺️ <strong style="color:var(--text)">Optimized walk order</strong> — greedy nearest-neighbor routing</li>
+          <li>🎙️ <strong style="color:var(--text)">Personalized opener</strong> — social proof if you add a neighbor name</li>
+          <li>💰 <strong style="color:var(--text)">Pipeline total</strong> — see the full $ opportunity on this block</li>
+        </ul>
+        <div style="margin-top:16px;padding:12px;background:var(--surface2);border-radius:8px;font-size:12px;color:var(--muted)">
+          <strong style="color:var(--accent)">Pro Tip:</strong> Enter the address of a homeowner who just signed or gave a referral as your seed. Their neighbors are statistically 3× more likely to convert.
+        </div>
+      </div>
+    </div>
+    <div id="canvass-result"></div>
+  </div>
+
   <!-- HISTORY PANEL -->
   <div id="tab-history" class="panel">
     <div class="card" style="margin-bottom:16px;">
@@ -375,7 +441,7 @@
           <p><span style="color:var(--green)">POST</span> <span style="color:var(--accent)">/api/territory/scan</span> — Scan a zip code territory</p>
           <p><span style="color:var(--green)">POST</span> <span style="color:var(--accent)">/api/territory/compare</span> — Compare multiple zip codes</p>
           <p><span style="color:var(--green)">GET</span> <span style="color:var(--accent)">/api/lead/proposal</span> — Generate full HTML proposal</p>
-          <p><span style="color:var(--green)">POST</span> <span style="color:var(--accent)">/api/lead/canvass</span> — Door-knock route optimizer</p>
+          <p><span style="color:var(--green)">POST</span> <span style="color:var(--accent)">/api/lead/canvass</span> — Door-knock route optimizer (🚪 Canvass tab)</p>
           <p><span style="color:var(--green)">GET</span> <span style="color:var(--accent)">/api/stats</span> — Aggregate pipeline stats from cache</p>
           <p><span style="color:var(--green)">GET</span> <span style="color:var(--accent)">/api/leads/history</span> — All enriched leads, filterable</p>
           <p><span style="color:var(--green)">GET</span> <span style="color:var(--accent)">/api/territory/cached</span> — List previous scans</p>
@@ -539,6 +605,11 @@ function switchTab(name) {
   event.target.classList.add('active');
   document.getElementById('tab-' + name).classList.add('active');
   if (name === 'history') loadHistory();
+  if (name === 'canvass') {
+    // pre-fill with a Gilbert example if empty
+    const ca = document.getElementById('canvass-address');
+    if (!ca.value) ca.value = '1905 E Marquette Dr, Gilbert, AZ 85234';
+  }
 }
 
 function quickLoad(addr, bill) {
@@ -703,6 +774,155 @@ function renderTerritory(d) {
       </div>
     </div>
   `;
+}
+
+// ── Canvass route ──────────────────────────────────────────────────────────
+async function runCanvass() {
+  const address = document.getElementById('canvass-address').value.trim();
+  const radius = parseInt(document.getElementById('canvass-radius').value);
+  const homes = parseInt(document.getElementById('canvass-homes').value);
+  const bill = parseFloat(document.getElementById('canvass-bill').value) || 175;
+  const neighbor = document.getElementById('canvass-neighbor').value.trim();
+  const hotOnly = document.getElementById('canvass-hotonly').checked;
+
+  if (!address) { alert('Please enter a seed address'); return; }
+
+  const btn = document.getElementById('canvass-btn');
+  btn.disabled = true; btn.textContent = '⏳ Building route...';
+  document.getElementById('canvass-result').innerHTML = '<div class="loading"><div class="spinner"></div> Analyzing ' + homes + ' homes within ' + radius + 'm… this takes ~30-60 seconds</div>';
+  document.getElementById('canvass-error').innerHTML = '';
+
+  try {
+    const r = await fetch(`${API}/api/lead/canvass`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        seed_address: address,
+        radius_m: radius,
+        max_homes: homes,
+        monthly_bill: bill,
+        neighbor_name: neighbor || null,
+        hot_only: hotOnly
+      })
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.detail || 'API error');
+    renderCanvass(data, address, neighbor);
+  } catch(e) {
+    document.getElementById('canvass-result').innerHTML = '';
+    document.getElementById('canvass-error').innerHTML = `<div class="error-msg">❌ ${e.message}</div>`;
+  } finally {
+    btn.disabled = false; btn.textContent = '🚪 Build Door-Knock Route';
+  }
+}
+
+function renderCanvass(d, seedAddress, neighborName) {
+  const stops = d.canvass_stops || [];
+  const walkMin = d.route_walk_minutes || 0;
+  const routeM = Math.round(d.route_distance_m || 0);
+  const hot = d.hot_leads || 0;
+  const warm = d.warm_leads || 0;
+  const avgScore = (d.avg_lead_score || 0).toFixed(1);
+  const pipeline = Math.round(d.total_pipeline_annual_usd || 0);
+
+  // Summary row
+  let html = `
+    <div class="section-title">🚪 Canvass Route — ${stops.length} stops near ${seedAddress}</div>
+    <div class="grid-4" style="margin-bottom:16px;">
+      <div class="stat"><div class="stat-value">${stops.length}</div><div class="stat-label">Total Stops</div></div>
+      <div class="stat"><div class="stat-value" style="color:var(--hot)">${hot}</div><div class="stat-label">🔥 HOT Leads</div></div>
+      <div class="stat"><div class="stat-value">${avgScore}/100</div><div class="stat-label">Avg Score</div></div>
+      <div class="stat"><div class="stat-value" style="color:var(--green)">$${pipeline.toLocaleString()}</div><div class="stat-label">Pipeline/Yr</div></div>
+    </div>
+    <div class="card" style="margin-bottom:16px;padding:14px 18px;display:flex;gap:24px;align-items:center;flex-wrap:wrap;">
+      <div style="font-size:13px;color:var(--muted)">🚶 Walk time: <strong style="color:var(--text)">${walkMin} min</strong></div>
+      <div style="font-size:13px;color:var(--muted)">📏 Route distance: <strong style="color:var(--text)">${routeM}m</strong></div>
+      <div style="font-size:13px;color:var(--muted)">☀️ WARM leads: <strong style="color:var(--warm)">${warm}</strong></div>
+      ${neighborName ? `<div style="font-size:13px;color:var(--muted)">🎙️ Social proof: <strong style="color:var(--accent)">"${neighborName}"</strong></div>` : ''}
+    </div>
+  `;
+
+  // Stop cards — data is flat on the stop object (not nested under 'lead')
+  if (stops.length === 0) {
+    html += '<div class="empty">No stops in this canvass zone. Try increasing the radius or removing HOT-only filter.</div>';
+  } else {
+    html += '<div style="display:flex;flex-direction:column;gap:16px;">';
+    stops.forEach((stop, i) => {
+      const pri = stop.priority || 'COOL';
+      const priColors = {HOT:'var(--hot)',WARM:'var(--warm)',COOL:'var(--muted)',LOW:'var(--muted)'};
+      const priIcons = {HOT:'🔥',WARM:'☀️',COOL:'❄️',LOW:'📉'};
+      const score = stop.lead_score || 0;
+      const fillClass = pri === 'HOT' ? 'fill-hot' : pri === 'WARM' ? 'fill-warm' : 'fill-cool';
+      const savings = Math.round(stop.annual_savings_usd || 0);
+      const payback = (stop.payback_years || 0).toFixed(1);
+      const panels = stop.panels_recommended || 0;
+      const kw = stop.system_size_kw || 0;
+      const brief = stop.door_knocker_brief || '';
+      const tps = (stop.talking_points || []).slice(0, 3);
+      const distText = stop.dist_from_prev_m != null ? `${Math.round(stop.dist_from_prev_m)}m from prev` : '';
+      const addr = (stop.address || '').replace(/'/g, "\\'");
+      const imgUrl = (stop.lat && stop.lng)
+        ? `https://maps.googleapis.com/maps/api/staticmap?center=${stop.lat},${stop.lng}&zoom=19&size=280x180&maptype=satellite&key=AIzaSyAv-Mct8m2zynAFIcaCAwjNOthrDrezGO4`
+        : null;
+
+      html += `
+        <div class="card" style="border-left:4px solid ${priColors[pri]};">
+          <div style="display:flex;justify-content:space-between;align-items:start;flex-wrap:wrap;gap:12px;margin-bottom:14px;">
+            <div style="flex:1;min-width:200px;">
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">
+                <div style="font-size:22px;font-weight:900;color:var(--muted);min-width:32px;">STOP ${i+1}</div>
+                <span class="badge badge-${pri}">${priIcons[pri]} ${pri}</span>
+                ${distText ? `<span style="font-size:11px;color:var(--muted)">${distText}</span>` : ''}
+              </div>
+              <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:2px;">${stop.address || '—'}</div>
+            </div>
+            <div style="text-align:right;">
+              <div style="font-size:28px;font-weight:900;color:var(--accent)">${score}</div>
+              <div style="font-size:11px;color:var(--muted)">/ 100</div>
+              <div class="score-bar" style="width:60px;height:5px;margin-top:4px;margin-left:auto"><div class="score-fill ${fillClass}" style="width:${Math.min(100,score)}%"></div></div>
+            </div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:${imgUrl ? '1fr 188px' : '1fr'};gap:16px;align-items:start;">
+            <div>
+              <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px;">
+                <div class="stat" style="padding:10px"><div class="stat-value" style="font-size:18px;color:var(--green)">$${savings.toLocaleString()}</div><div class="stat-label">Yr1 Savings</div></div>
+                <div class="stat" style="padding:10px"><div class="stat-value" style="font-size:18px">${payback}yr</div><div class="stat-label">Payback</div></div>
+                <div class="stat" style="padding:10px"><div class="stat-value" style="font-size:18px">${panels}p/${kw}kW</div><div class="stat-label">System</div></div>
+              </div>
+
+              ${brief ? `
+              <div style="background:var(--surface2);border-radius:8px;padding:12px;margin-bottom:12px;border-left:3px solid var(--accent);">
+                <div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">🎙️ Door Knocker Brief</div>
+                <div style="font-size:13px;color:var(--text);font-style:italic;">"${brief}"</div>
+              </div>` : ''}
+
+              ${tps.length > 0 ? `
+              <div>
+                <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">Talking Points</div>
+                <ul class="talking-points" style="margin:0">${tps.map(tp=>`<li>${tp}</li>`).join('')}</ul>
+              </div>` : ''}
+            </div>
+            ${imgUrl ? `
+            <div>
+              <img src="${imgUrl}" style="width:100%;border-radius:8px;object-fit:cover;" onerror="this.style.display='none'" />
+              <div style="margin-top:8px;display:flex;gap:6px;flex-direction:column;">
+                <button onclick="quickLoad('${addr}', 175)" style="background:var(--accent2);border:none;color:#fff;padding:6px 10px;border-radius:6px;font-size:12px;cursor:pointer;width:100%">⚡ Full Analysis</button>
+                <button onclick="openProposalForLead('${addr}', '')" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-size:12px;cursor:pointer;width:100%">📄 Generate Proposal</button>
+              </div>
+            </div>` : `
+            <div style="display:flex;gap:6px;flex-direction:column;margin-top:8px;">
+              <button onclick="quickLoad('${addr}', 175)" style="background:var(--accent2);border:none;color:#fff;padding:6px 10px;border-radius:6px;font-size:12px;cursor:pointer">⚡ Full Analysis</button>
+              <button onclick="openProposalForLead('${addr}', '')" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-size:12px;cursor:pointer">📄 Proposal</button>
+            </div>`}
+          </div>
+        </div>
+      `;
+    });
+    html += '</div>';
+  }
+
+  document.getElementById('canvass-result').innerHTML = html;
 }
 
 async function generateProposal() {
