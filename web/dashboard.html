@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>☀️ Solar Intelligence Suite</title>
+<style>
+  :root {
+    --bg: #0a0e1a;
+    --surface: #111827;
+    --surface2: #1a2236;
+    --border: #1f2d47;
+    --accent: #f59e0b;
+    --accent2: #3b82f6;
+    --green: #10b981;
+    --red: #ef4444;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --hot: #ef4444;
+    --warm: #f59e0b;
+    --cool: #3b82f6;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  /* Header */
+  .header { background: linear-gradient(135deg, #0a0e1a 0%, #1a1f35 100%); border-bottom: 1px solid var(--border); padding: 16px 24px; display: flex; align-items: center; gap: 16px; }
+  .logo { font-size: 28px; }
+  .header h1 { font-size: 22px; font-weight: 700; color: var(--accent); }
+  .header p { font-size: 13px; color: var(--muted); margin-top: 2px; }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 8px var(--green); animation: pulse 2s infinite; margin-left: auto; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+
+  /* Layout */
+  .container { max-width: 1400px; margin: 0 auto; padding: 24px; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  @media(max-width:900px) { .grid-2,.grid-3,.grid-4 { grid-template-columns: 1fr; } }
+
+  /* Cards */
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+  .card-title { font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+  .card-title span { font-size: 16px; }
+
+  /* Tabs */
+  .tabs { display: flex; gap: 8px; margin-bottom: 24px; flex-wrap: wrap; }
+  .tab { padding: 8px 18px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--muted); cursor: pointer; font-size: 14px; font-weight: 500; transition: all .2s; }
+  .tab.active { background: var(--accent); border-color: var(--accent); color: #000; font-weight: 700; }
+  .tab:hover:not(.active) { border-color: var(--accent); color: var(--accent); }
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  /* Form elements */
+  .form-group { margin-bottom: 16px; }
+  label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; font-weight: 500; }
+  input, select { width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; color: var(--text); font-size: 14px; outline: none; transition: border-color .2s; }
+  input:focus, select:focus { border-color: var(--accent); }
+  .btn { width: 100%; padding: 12px; border-radius: 8px; border: none; font-size: 15px; font-weight: 700; cursor: pointer; transition: all .2s; }
+  .btn-primary { background: var(--accent); color: #000; }
+  .btn-primary:hover { background: #d97706; }
+  .btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+  .btn-secondary { background: var(--accent2); color: #fff; }
+  .input-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+  /* Stat cards */
+  .stat { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 16px; text-align: center; }
+  .stat-value { font-size: 28px; font-weight: 800; color: var(--accent); line-height: 1; }
+  .stat-label { font-size: 12px; color: var(--muted); margin-top: 6px; text-transform: uppercase; letter-spacing: .04em; }
+  .stat-sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+  /* Grade badge */
+  .grade { display: inline-block; padding: 4px 14px; border-radius: 100px; font-size: 20px; font-weight: 800; }
+  .grade-HOT { background: rgba(239,68,68,.15); color: var(--hot); border: 1px solid rgba(239,68,68,.3); }
+  .grade-WARM { background: rgba(245,158,11,.15); color: var(--warm); border: 1px solid rgba(245,158,11,.3); }
+  .grade-COOL { background: rgba(59,130,246,.15); color: var(--cool); border: 1px solid rgba(59,130,246,.3); }
+
+  /* Score bar */
+  .score-bar-wrap { margin: 12px 0; }
+  .score-label { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  .score-bar { height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; }
+  .score-fill { height: 100%; border-radius: 4px; transition: width 1s ease; }
+  .fill-hot { background: linear-gradient(90deg, #f59e0b, #ef4444); }
+  .fill-warm { background: linear-gradient(90deg, #3b82f6, #f59e0b); }
+  .fill-cool { background: linear-gradient(90deg, #1d4ed8, #3b82f6); }
+
+  /* Talking points */
+  .talking-points { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+  .talking-points li { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; font-size: 13px; line-height: 1.5; }
+  .talking-points li:first-child { border-left: 3px solid var(--accent); }
+
+  /* Prospect table */
+  .prospect-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .prospect-table th { background: var(--surface2); color: var(--muted); font-weight: 600; text-transform: uppercase; font-size: 11px; letter-spacing: .05em; padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); }
+  .prospect-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); color: var(--text); }
+  .prospect-table tr:hover td { background: var(--surface2); }
+  .badge { display: inline-block; padding: 2px 10px; border-radius: 100px; font-size: 11px; font-weight: 700; }
+  .badge-HOT { background: rgba(239,68,68,.15); color: var(--hot); }
+  .badge-WARM { background: rgba(245,158,11,.15); color: var(--warm); }
+  .badge-COOL { background: rgba(59,130,246,.15); color: var(--cool); }
+  .badge-LOW { background: rgba(100,116,139,.15); color: var(--muted); }
+
+  /* Loading */
+  .loading { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 40px; color: var(--muted); font-size: 14px; }
+  .spinner { width: 20px; height: 20px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; }
+  @keyframes spin { to{transform:rotate(360deg)} }
+
+  /* Error / empty */
+  .empty { text-align: center; padding: 40px; color: var(--muted); font-size: 14px; }
+  .error-msg { background: rgba(239,68,68,.1); border: 1px solid rgba(239,68,68,.3); border-radius: 8px; padding: 12px 16px; color: #fca5a5; font-size: 13px; margin-top: 12px; }
+
+  /* Map placeholder */
+  .map-embed { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; height: 300px; display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 13px; }
+
+  /* Section divider */
+  .section-title { font-size: 16px; font-weight: 700; color: var(--text); margin: 24px 0 12px; display: flex; align-items: center; gap: 8px; }
+
+  /* Result container */
+  #lead-result, #territory-result { margin-top: 20px; }
+
+  /* Responsive tweaks */
+  .full-width { grid-column: 1 / -1; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">☀️</div>
+  <div>
+    <h1>Solar Intelligence Suite</h1>
+    <p>AI-powered lead enrichment & territory analysis · Powered by Google Solar API</p>
+  </div>
+  <div class="status-dot" title="API Online"></div>
+</div>
+
+<div class="container">
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('lead')">🎯 Lead Enrichment</div>
+    <div class="tab" onclick="switchTab('territory')">🗺️ Territory Scanner</div>
+    <div class="tab" onclick="switchTab('proposal')">📄 Proposal Builder</div>
+    <div class="tab" onclick="switchTab('about')">📖 How It Works</div>
+  </div>
+
+  <!-- LEAD ENRICHMENT PANEL -->
+  <div id="tab-lead" class="panel active">
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title"><span>🏠</span> Enrich a Lead</div>
+        <div class="form-group">
+          <label>Property Address</label>
+          <input type="text" id="lead-address" placeholder="123 Main St, Phoenix, AZ 85001" />
+        </div>
+        <div class="input-row">
+          <div class="form-group">
+            <label>Monthly Electric Bill ($)</label>
+            <input type="number" id="lead-bill" value="175" min="50" max="1000" />
+          </div>
+          <div class="form-group">
+            <label>Utility Rate ($/kWh)</label>
+            <input type="number" id="lead-rate" value="0.14" min="0.08" max="0.40" step="0.01" />
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="enrichLead()" id="lead-btn">⚡ Analyze Lead</button>
+        <div id="lead-error"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title"><span>💡</span> Quick Examples</div>
+        <p style="font-size:13px;color:var(--muted);margin-bottom:12px;">Click any address to run a live analysis:</p>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <button class="btn btn-secondary" style="width:100%;text-align:left;padding:10px 14px;font-size:13px;font-weight:500;border-radius:8px;cursor:pointer;" onclick="quickLoad('4523 E Thornton Ave, Gilbert, AZ 85234', 210)">🌵 Phoenix suburb — $210/mo</button>
+          <button class="btn btn-secondary" style="width:100%;text-align:left;padding:10px 14px;font-size:13px;font-weight:500;border-radius:8px;cursor:pointer;" onclick="quickLoad('1847 Oak Canyon Dr, Austin, TX 78745', 190)">🤠 Austin, TX — $190/mo</button>
+          <button class="btn btn-secondary" style="width:100%;text-align:left;padding:10px 14px;font-size:13px;font-weight:500;border-radius:8px;cursor:pointer;" onclick="quickLoad('892 Sunset Blvd, San Diego, CA 92103', 280)">🌊 San Diego, CA — $280/mo</button>
+          <button class="btn btn-secondary" style="width:100%;text-align:left;padding:10px 14px;font-size:13px;font-weight:500;border-radius:8px;cursor:pointer;" onclick="quickLoad('3201 Maple Ave, Charlotte, NC 28205', 155)">🌲 Charlotte, NC — $155/mo</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="lead-result"></div>
+  </div>
+
+  <!-- TERRITORY SCANNER PANEL -->
+  <div id="tab-territory" class="panel">
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title"><span>🗺️</span> Scan a Territory</div>
+        <div class="form-group">
+          <label>Zip Code</label>
+          <input type="text" id="zip-code" placeholder="85001" maxlength="5" />
+        </div>
+        <div class="input-row">
+          <div class="form-group">
+            <label>Sample Size (addresses)</label>
+            <select id="sample-size">
+              <option value="5">5 addresses (fast)</option>
+              <option value="8" selected>8 addresses</option>
+              <option value="10">10 addresses</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Avg Monthly Bill ($)</label>
+            <input type="number" id="zip-bill" value="175" />
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="scanTerritory()" id="territory-btn">🔍 Scan Territory</button>
+        <div id="territory-error"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title"><span>📊</span> What You Get</div>
+        <ul style="list-style:none;display:flex;flex-direction:column;gap:10px;font-size:13px;color:var(--muted)">
+          <li>☀️ <strong style="color:var(--text)">Rooftop analysis</strong> on every address — panels, sunshine, segments</li>
+          <li>💰 <strong style="color:var(--text)">Financial projections</strong> — savings, payback, 25yr ROI per home</li>
+          <li>🏆 <strong style="color:var(--text)">Lead scoring</strong> — automatically ranks HOT / WARM / COOL</li>
+          <li>📋 <strong style="color:var(--text)">Rep talking points</strong> — pre-built for each specific address</li>
+          <li>📍 <strong style="color:var(--text)">Territory grade</strong> — is this zip worth working?</li>
+        </ul>
+      </div>
+    </div>
+    <div id="territory-result"></div>
+  </div>
+
+  <!-- PROPOSAL PANEL -->
+  <div id="tab-proposal" class="panel">
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title"><span>📄</span> Generate Proposal</div>
+        <div class="form-group">
+          <label>Property Address</label>
+          <input type="text" id="prop-address" placeholder="123 Main St, Phoenix, AZ 85001" />
+        </div>
+        <div class="input-row">
+          <div class="form-group">
+            <label>Customer Name</label>
+            <input type="text" id="prop-customer" placeholder="John Smith" />
+          </div>
+          <div class="form-group">
+            <label>Rep Name</label>
+            <input type="text" id="prop-rep" placeholder="Your Name" />
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Monthly Electric Bill ($)</label>
+          <input type="number" id="prop-bill" value="175" />
+        </div>
+        <button class="btn btn-primary" onclick="generateProposal()">📄 Generate Proposal</button>
+      </div>
+      <div class="card">
+        <div class="card-title"><span>🎯</span> Proposal includes</div>
+        <ul style="list-style:none;display:flex;flex-direction:column;gap:8px;font-size:13px;color:var(--muted)">
+          <li>✅ System size & panel count recommendation</li>
+          <li>✅ Gross cost → Tax credit → Net investment breakdown</li>
+          <li>✅ Year 1 savings & monthly loan estimate</li>
+          <li>✅ Payback period & 25-year ROI</li>
+          <li>✅ Environmental impact (CO₂, trees)</li>
+          <li>✅ Google Solar API roof analysis data</li>
+          <li>✅ Rep talking points for this specific home</li>
+        </ul>
+      </div>
+    </div>
+    <div id="proposal-result" style="margin-top:20px;"></div>
+  </div>
+
+  <!-- ABOUT PANEL -->
+  <div id="tab-about" class="panel">
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title"><span>🔬</span> How Lead Enrichment Works</div>
+        <div style="font-size:13px;color:var(--muted);line-height:1.8;">
+          <p><strong style="color:var(--accent)">1. Geocoding</strong> — Address → precise lat/lng via Google Maps API</p>
+          <p><strong style="color:var(--accent)">2. Solar API</strong> — Google's satellite + ML analysis of the exact roof</p>
+          <p><strong style="color:var(--accent)">3. Panel Matching</strong> — Picks the right system size for their usage</p>
+          <p><strong style="color:var(--accent)">4. Financials</strong> — Calculates savings, ITC, payback, 25yr ROI</p>
+          <p><strong style="color:var(--accent)">5. Lead Scoring</strong> — 5-factor score: sunshine, roof, bill, payback, ROI</p>
+          <p><strong style="color:var(--accent)">6. Talking Points</strong> — Address-specific pitch points for your rep</p>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title"><span>📡</span> Data Sources</div>
+        <div style="font-size:13px;color:var(--muted);line-height:2;">
+          <p>☀️ <strong style="color:var(--text)">Google Solar API</strong> — Rooftop solar potential, 472M+ buildings</p>
+          <p>🗺️ <strong style="color:var(--text)">Google Geocoding</strong> — Address verification & lat/lng</p>
+          <p>📍 <strong style="color:var(--text)">Google Places API</strong> — Territory residential discovery</p>
+          <p>🛰️ <strong style="color:var(--text)">Google Static Maps</strong> — Aerial roof imagery</p>
+          <p>💰 <strong style="color:var(--text)">EIA averages</strong> — US utility rates & carbon factors</p>
+        </div>
+      </div>
+      <div class="card full-width">
+        <div class="card-title"><span>🔌</span> API Endpoints</div>
+        <div style="font-family:monospace;font-size:12px;color:var(--muted);line-height:2.2;">
+          <p><span style="color:var(--green)">GET/POST</span> <span style="color:var(--accent)">/api/lead/enrich</span> — Enrich a single address</p>
+          <p><span style="color:var(--green)">POST</span> <span style="color:var(--accent)">/api/territory/scan</span> — Scan a zip code territory</p>
+          <p><span style="color:var(--green)">POST</span> <span style="color:var(--accent)">/api/territory/compare</span> — Compare multiple zip codes</p>
+          <p><span style="color:var(--green)">GET</span> <span style="color:var(--accent)">/api/proposal/{address}</span> — Generate full proposal</p>
+          <p><span style="color:var(--green)">GET</span> <span style="color:var(--accent)">/api/territory/cached</span> — List previous scans</p>
+          <p><span style="color:var(--green)">GET</span> <span style="color:var(--accent)">/health</span> — Service health check</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const API = '';  // Same origin
+
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  event.target.classList.add('active');
+  document.getElementById('tab-' + name).classList.add('active');
+}
+
+function quickLoad(addr, bill) {
+  document.getElementById('lead-address').value = addr;
+  document.getElementById('lead-bill').value = bill;
+  enrichLead();
+}
+
+async function enrichLead() {
+  const address = document.getElementById('lead-address').value.trim();
+  const bill = parseFloat(document.getElementById('lead-bill').value) || 175;
+  const rate = parseFloat(document.getElementById('lead-rate').value) || 0.14;
+  if (!address) { alert('Please enter an address'); return; }
+
+  const btn = document.getElementById('lead-btn');
+  btn.disabled = true; btn.textContent = '⏳ Analyzing...';
+  document.getElementById('lead-result').innerHTML = '<div class="loading"><div class="spinner"></div> Pulling satellite data + calculating solar potential...</div>';
+  document.getElementById('lead-error').innerHTML = '';
+
+  try {
+    const r = await fetch(`${API}/api/lead/enrich?address=${encodeURIComponent(address)}&monthly_bill=${bill}&utility_rate=${rate}`);
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.detail || 'API error');
+    renderLead(data);
+  } catch(e) {
+    document.getElementById('lead-result').innerHTML = '';
+    document.getElementById('lead-error').innerHTML = `<div class="error-msg">❌ ${e.message}</div>`;
+  } finally {
+    btn.disabled = false; btn.textContent = '⚡ Analyze Lead';
+  }
+}
+
+function renderLead(d) {
+  const priorityClass = d.priority || 'COOL';
+  const scoreWidth = Math.min(100, d.lead_score || 0);
+  const fillClass = priorityClass === 'HOT' ? 'fill-hot' : priorityClass === 'WARM' ? 'fill-warm' : 'fill-cool';
+
+  const tps = (d.talking_points || []).map(tp => `<li>${tp}</li>`).join('');
+
+  const imgUrl = `https://maps.googleapis.com/maps/api/staticmap?center=${d.lat},${d.lng}&zoom=18&size=600x300&maptype=satellite&key=AIzaSyAv-Mct8m2zynAFIcaCAwjNOthrDrezGO4`;
+
+  document.getElementById('lead-result').innerHTML = `
+    <div class="section-title">📊 Analysis Results — ${d.address}</div>
+    <div class="grid-4" style="margin-bottom:16px;">
+      <div class="stat"><div class="stat-value">${d.lead_score}</div><div class="stat-label">Lead Score</div><div class="stat-sub">out of 100</div></div>
+      <div class="stat"><div class="stat-value" style="color:var(--green)">$${(d.annual_savings_yr1_usd||0).toLocaleString()}</div><div class="stat-label">Year 1 Savings</div></div>
+      <div class="stat"><div class="stat-value">${d.payback_years}</div><div class="stat-label">Payback Years</div></div>
+      <div class="stat"><div class="stat-value">${d.roi_25yr_pct}%</div><div class="stat-label">25-Year ROI</div></div>
+    </div>
+
+    <div class="grid-2" style="margin-bottom:16px;">
+      <div class="card">
+        <div class="card-title"><span>⚡</span> Lead Intelligence</div>
+        <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px;">
+          <div class="grade grade-${priorityClass}">${d.lead_grade}</div>
+          <div>
+            <div style="font-size:16px;font-weight:700;color:var(--text)">${priorityClass} Lead</div>
+            <div style="font-size:12px;color:var(--muted)">${d.city}, ${d.state} · ${d.postal_code}</div>
+          </div>
+        </div>
+        <div class="score-bar-wrap">
+          <div class="score-label"><span>Lead Score</span><span>${d.lead_score}/100</span></div>
+          <div class="score-bar"><div class="score-fill ${fillClass}" style="width:${scoreWidth}%"></div></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:16px;font-size:13px;">
+          <div style="color:var(--muted)">☀️ Sunshine hrs/yr</div><div style="text-align:right;font-weight:600">${(d.sunshine_hours_per_year||0).toLocaleString()}</div>
+          <div style="color:var(--muted)">🏠 Roof segments</div><div style="text-align:right;font-weight:600">${d.roof_segments}</div>
+          <div style="color:var(--muted)">🔋 Max panels possible</div><div style="text-align:right;font-weight:600">${d.max_panels_possible}</div>
+          <div style="color:var(--muted)">✅ Panels recommended</div><div style="text-align:right;font-weight:600;color:var(--accent)">${d.panels_recommended}</div>
+          <div style="color:var(--muted)">⚡ System size</div><div style="text-align:right;font-weight:600">${d.system_size_kw} kW</div>
+          <div style="color:var(--muted)">📊 Energy offset</div><div style="text-align:right;font-weight:600;color:var(--green)">${d.offset_pct}%</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title"><span>💰</span> Financial Summary</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:13px;">
+          <div style="color:var(--muted)">Gross system cost</div><div style="text-align:right;font-weight:600">$${(d.gross_cost_usd||0).toLocaleString()}</div>
+          <div style="color:var(--muted)">Federal ITC (30%)</div><div style="text-align:right;font-weight:600;color:var(--green)">-$${(d.federal_itc_usd||0).toLocaleString()}</div>
+          <div style="color:var(--muted)">Net investment</div><div style="text-align:right;font-weight:700;color:var(--accent)">$${(d.net_cost_usd||0).toLocaleString()}</div>
+          <div style="color:var(--muted);border-top:1px solid var(--border);padding-top:8px;margin-top:4px">Year 1 savings</div><div style="text-align:right;font-weight:600;color:var(--green);border-top:1px solid var(--border);padding-top:8px;margin-top:4px">$${(d.annual_savings_yr1_usd||0).toLocaleString()}/yr</div>
+          <div style="color:var(--muted)">Payback period</div><div style="text-align:right;font-weight:600">${d.payback_years} years</div>
+          <div style="color:var(--muted)">25-year savings</div><div style="text-align:right;font-weight:700;color:var(--green)">$${(d.lifetime_savings_usd||0).toLocaleString()}</div>
+          <div style="color:var(--muted)">25-year ROI</div><div style="text-align:right;font-weight:700;color:var(--accent)">${d.roi_25yr_pct}%</div>
+          <div style="color:var(--muted)">CO₂ offset/yr</div><div style="text-align:right">${(d.co2_offset_lbs_per_year||0).toLocaleString()} lbs</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title"><span>🎙️</span> Rep Talking Points</div>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:12px;">Generated specifically for this address — ready to use on your call:</p>
+        <ul class="talking-points">${tps}</ul>
+      </div>
+      <div class="card">
+        <div class="card-title"><span>🛰️</span> Roof Aerial View</div>
+        <img src="${imgUrl}" style="width:100%;border-radius:8px;object-fit:cover;height:260px;" onerror="this.parentElement.innerHTML='<div class=map-embed>Aerial imagery requires valid API key scope</div>'" />
+      </div>
+    </div>
+  `;
+}
+
+async function scanTerritory() {
+  const zip = document.getElementById('zip-code').value.trim();
+  const size = parseInt(document.getElementById('sample-size').value);
+  const bill = parseFloat(document.getElementById('zip-bill').value) || 175;
+  if (!zip || zip.length < 4) { alert('Please enter a valid zip code'); return; }
+
+  const btn = document.getElementById('territory-btn');
+  btn.disabled = true; btn.textContent = '⏳ Scanning...';
+  document.getElementById('territory-result').innerHTML = '<div class="loading"><div class="spinner"></div> Scanning territory... this takes ~30-60 seconds for full analysis</div>';
+  document.getElementById('territory-error').innerHTML = '';
+
+  try {
+    const r = await fetch(`${API}/api/territory/scan`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({zip_code: zip, sample_size: size, avg_monthly_bill: bill})
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.detail || 'API error');
+    renderTerritory(data);
+  } catch(e) {
+    document.getElementById('territory-result').innerHTML = '';
+    document.getElementById('territory-error').innerHTML = `<div class="error-msg">❌ ${e.message}</div>`;
+  } finally {
+    btn.disabled = false; btn.textContent = '🔍 Scan Territory';
+  }
+}
+
+function renderTerritory(d) {
+  const gradeClass = d.territory_grade === 'HOT' ? 'HOT' : d.territory_grade === 'WARM' ? 'WARM' : 'COOL';
+  const rows = (d.prospects || []).map(p => `
+    <tr>
+      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.address}</td>
+      <td><span class="badge badge-${p.priority}">${p.priority}</span></td>
+      <td style="font-weight:700">${p.lead_score}/100</td>
+      <td>${p.panels_recommended}</td>
+      <td style="color:var(--green);font-weight:600">$${(p.annual_savings_yr1_usd||0).toLocaleString()}</td>
+      <td>$${(p.net_cost_usd||0).toLocaleString()}</td>
+      <td>${p.payback_years} yrs</td>
+      <td>${(p.sunshine_hours_per_year||0).toLocaleString()}</td>
+    </tr>
+  `).join('');
+
+  document.getElementById('territory-result').innerHTML = `
+    <div class="section-title">📊 Territory Report — ${d.zip_code}</div>
+    <div class="grid-4" style="margin-bottom:16px;">
+      <div class="stat"><div class="grade grade-${gradeClass}" style="font-size:22px">${d.territory_grade}</div><div class="stat-label">Territory Grade</div></div>
+      <div class="stat"><div class="stat-value">${d.avg_lead_score}</div><div class="stat-label">Avg Lead Score</div></div>
+      <div class="stat"><div class="stat-value" style="color:var(--hot)">${d.hot_leads}</div><div class="stat-label">HOT Leads</div></div>
+      <div class="stat"><div class="stat-value" style="color:var(--green)">$${(d.avg_annual_savings_usd||0).toLocaleString()}</div><div class="stat-label">Avg Year 1 Savings</div></div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span>🏆</span> Ranked Prospects</div>
+      <div style="overflow-x:auto;">
+        <table class="prospect-table">
+          <thead><tr><th>Address</th><th>Priority</th><th>Score</th><th>Panels</th><th>Yr1 Savings</th><th>Net Cost</th><th>Payback</th><th>Sun hrs/yr</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+async function generateProposal() {
+  const address = document.getElementById('prop-address').value.trim();
+  const customer = document.getElementById('prop-customer').value || 'Homeowner';
+  const rep = document.getElementById('prop-rep').value || 'Solar Advisor';
+  const bill = parseFloat(document.getElementById('prop-bill').value) || 175;
+  if (!address) { alert('Please enter an address'); return; }
+
+  document.getElementById('proposal-result').innerHTML = '<div class="loading"><div class="spinner"></div> Generating proposal...</div>';
+
+  try {
+    const r = await fetch(`${API}/api/proposal/${encodeURIComponent(address)}?monthly_bill=${bill}&customer_name=${encodeURIComponent(customer)}&rep_name=${encodeURIComponent(rep)}`);
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.detail || 'API error');
+
+    const tps = (data.rep_talking_points || []).map(tp => `<li>${tp}</li>`).join('');
+    document.getElementById('proposal-result').innerHTML = `
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+          <div>
+            <div style="font-size:20px;font-weight:800">Solar Proposal</div>
+            <div style="font-size:14px;color:var(--muted)">${data.property_address}</div>
+            <div style="font-size:13px;color:var(--muted)">For: ${data.proposal_for} · Prepared by: ${data.prepared_by}</div>
+          </div>
+          <div class="grade grade-${data.lead_intelligence?.priority || 'COOL'}">${data.lead_intelligence?.lead_grade || 'B'}</div>
+        </div>
+        <div class="grid-3">
+          <div class="card" style="background:var(--surface2)">
+            <div class="card-title">System Overview</div>
+            <div style="font-size:13px;display:grid;gap:6px;">
+              ${Object.entries(data.executive_summary||{}).map(([k,v]) => `<div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">${k.replace(/_/g,' ')}</span><span style="font-weight:600">${v}</span></div>`).join('')}
+            </div>
+          </div>
+          <div class="card" style="background:var(--surface2)">
+            <div class="card-title">Investment</div>
+            <div style="font-size:13px;display:grid;gap:6px;">
+              ${Object.entries(data.investment||{}).map(([k,v]) => `<div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">${k.replace(/_/g,' ')}</span><span style="font-weight:600;color:${k.includes('net') ? 'var(--accent)' : k.includes('credit') ? 'var(--green)' : 'var(--text)'}">${v}</span></div>`).join('')}
+            </div>
+          </div>
+          <div class="card" style="background:var(--surface2)">
+            <div class="card-title">Savings</div>
+            <div style="font-size:13px;display:grid;gap:6px;">
+              ${Object.entries(data.savings||{}).map(([k,v]) => `<div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">${k.replace(/_/g,' ')}</span><span style="font-weight:600;color:var(--green)">${v}</span></div>`).join('')}
+            </div>
+          </div>
+        </div>
+        <div style="margin-top:16px">
+          <div class="card-title"><span>🎙️</span> Rep Talking Points</div>
+          <ul class="talking-points">${tps}</ul>
+        </div>
+      </div>
+    `;
+  } catch(e) {
+    document.getElementById('proposal-result').innerHTML = `<div class="error-msg">❌ ${e.message}</div>`;
+  }
+}
+</script>
+</body>
+</html>
