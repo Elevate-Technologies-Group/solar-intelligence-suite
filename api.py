@@ -16,6 +16,7 @@ from typing import Optional
 import uvicorn
 
 from core.solar import enrich_lead, geocode_address
+from core.config import DEFAULT_UTILITY_RATE_KWH
 from tools.territory import scan_territory, multi_zip_comparison
 
 # Canvass tool import (optional — graceful if missing)
@@ -1665,6 +1666,136 @@ async def lead_ghl_push_get(
     result["grade"]      = lead.get("grade") if lead else None
     result["address"]    = address
     return JSONResponse(result)
+
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# INCENTIVES ENDPOINTS
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.get("/api/incentives",
+    summary="Get solar incentives for a state or address",
+    tags=["Incentives"])
+async def get_incentives_endpoint(
+    state: Optional[str]    = Query(None, description="2-letter state code (e.g. AZ)"),
+    address: Optional[str]  = Query(None, description="Full address — auto-extracts state"),
+    zip_code: Optional[str] = Query(None, description="ZIP code for context"),
+    gross_cost: float       = Query(20000.0, description="Gross system cost USD"),
+    system_kw: float        = Query(6.0,     description="System size in kW"),
+    panels: int             = Query(20,      description="Panel count"),
+    monthly_bill: float     = Query(175.0,   description="Monthly electric bill (used to estimate size if cost=0)"),
+):
+    """
+    Returns the complete federal + state + utility incentive stack for a state.
+
+    - `/api/incentives?state=AZ&gross_cost=19200&system_kw=6.4`
+    - `/api/incentives?address=1905+E+Marquette+Dr+Gilbert+AZ&gross_cost=19200`
+    - `/api/incentives?state=AZ` (uses defaults)
+    """
+    try:
+        from scripts.solar_incentives import get_incentives
+    except ImportError as e:
+        raise HTTPException(503, f"Incentives module not available: {e}")
+
+    target_state = state
+    postal_code  = zip_code
+
+    # Auto-extract state from address
+    if not target_state and address:
+        parts = address.replace(",", " ").split()
+        for p in reversed(parts):
+            if len(p) == 2 and p.isalpha():
+                target_state = p.upper()
+                break
+        # Try geocoding for state if address given
+        if not target_state:
+            try:
+                geo = geocode_address(address)
+                if "state" in geo:
+                    target_state = geo["state"]
+                if "postal_code" in geo:
+                    postal_code = geo["postal_code"]
+            except Exception:
+                pass
+
+    if not target_state:
+        target_state = "AZ"
+
+    result = get_incentives(
+        state=target_state,
+        postal_code=postal_code,
+        gross_cost_usd=gross_cost,
+        system_size_kw=system_kw,
+        panel_count=panels,
+    )
+    return JSONResponse(result)
+
+
+@app.get("/api/incentives/states",
+    summary="List all states with tracked incentives",
+    tags=["Incentives"])
+async def list_incentive_states():
+    """Returns all states with known state-level solar incentives beyond federal ITC."""
+    try:
+        from scripts.solar_incentives import STATE_INCENTIVES, list_states_with_incentives
+    except ImportError as e:
+        raise HTTPException(503, f"Incentives module not available: {e}")
+
+    states = list_states_with_incentives()
+    return JSONResponse({
+        "states_with_incentives": [
+            {
+                "state": s,
+                "program_count": len(STATE_INCENTIVES[s]),
+                "programs": [inc["name"] for inc in STATE_INCENTIVES[s]],
+            }
+            for s in states
+        ],
+        "total_states_tracked": len(states),
+        "note": "Federal ITC (30%) applies in all 50 states.",
+    })
+
+
+@app.get("/api/lead/incentives",
+    summary="Incentive stack for a specific lead address",
+    tags=["Incentives"])
+async def lead_incentives(
+    address: str        = Query(..., description="Address to enrich and look up incentives"),
+    monthly_bill: float = Query(175.0, description="Monthly electric bill"),
+    utility_rate: float = Query(DEFAULT_UTILITY_RATE_KWH, description="Utility rate $/kWh"),
+):
+    """
+    Enriches a lead AND returns the full incentive stack together.
+    Returns merged lead data + complete incentive breakdown.
+    Great for proposal generation and dashboard integration.
+    """
+    try:
+        from scripts.solar_incentives import get_incentives
+    except ImportError as e:
+        raise HTTPException(503, f"Incentives module not available: {e}")
+
+    # Enrich lead
+    lead = enrich_lead(address, monthly_bill=monthly_bill, utility_rate=utility_rate)
+    if "error" in lead:
+        raise HTTPException(422, f"Lead enrichment failed: {lead['error']}")
+
+    # Look up incentives
+    incentives = get_incentives(
+        state=lead.get("state", "AZ"),
+        postal_code=lead.get("postal_code"),
+        gross_cost_usd=lead.get("gross_cost_usd", 20000),
+        system_size_kw=lead.get("system_size_kw", 6.0),
+        panel_count=lead.get("panels_recommended", 20),
+    )
+
+    return JSONResponse({
+        **lead,
+        "incentives": incentives,
+        "total_incentive_savings_usd": incentives["total_savings_usd"],
+        "net_cost_with_all_incentives": incentives["net_cost_after_incentives"],
+        "effective_discount_pct": incentives["effective_discount_pct"],
+        "incentive_summary": incentives["summary_line"],
+    })
 
 
 if __name__ == "__main__":

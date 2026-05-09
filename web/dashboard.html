@@ -157,6 +157,7 @@
     <div class="tab" onclick="switchTab('lead-map')">🗺️ Lead Map</div>
     <div class="tab" onclick="switchTab('waiting-cost')">⏳ Cost of Waiting</div>
     <div class="tab" onclick="switchTab('financing')">💳 Financing Calculator</div>
+    <div class="tab" onclick="switchTab('incentives')">🏛️ Incentives Database</div>
     <div class="tab" onclick="switchTab('about')">📖 How It Works</div>
   </div>
 
@@ -764,10 +765,70 @@
     </div>
   </div>
 
+  <div id="tab-incentives" class="panel">
+    <div class="card full-width">
+      <div class="card-title"><span>🏛️</span> Solar Incentives Database</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px;">
+        <div>
+          <label style="font-size:12px;color:var(--muted);">State (2-letter code)</label>
+          <input id="inc-state" type="text" class="input" placeholder="AZ" maxlength="2" style="text-transform:uppercase;" oninput="this.value=this.value.toUpperCase()">
+        </div>
+        <div>
+          <label style="font-size:12px;color:var(--muted);">Gross System Cost ($)</label>
+          <input id="inc-cost" type="number" class="input" placeholder="19200" value="19200">
+        </div>
+        <div>
+          <label style="font-size:12px;color:var(--muted);">System Size (kW)</label>
+          <input id="inc-kw" type="number" class="input" placeholder="6.4" value="6.4" step="0.1">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
+        <div>
+          <label style="font-size:12px;color:var(--muted);">Or enter full address (auto-extracts state)</label>
+          <input id="inc-address" type="text" class="input" placeholder="1905 E Marquette Dr, Gilbert, AZ">
+        </div>
+        <div style="display:flex;align-items:flex-end;gap:8px;">
+          <button class="btn" onclick="loadIncentives()" style="flex:1;">🏛️ Look Up Incentives</button>
+          <button class="btn btn-secondary" onclick="loadIncentiveStates()" style="flex:1;">📋 All States</button>
+        </div>
+      </div>
+      <div id="incentives-result" style="display:none;"></div>
+    </div>
+
+    <div id="incentives-states-panel" style="display:none;" class="card full-width">
+      <div class="card-title"><span>📋</span> States with Solar Incentives Tracked</div>
+      <div id="incentives-states-list"></div>
+    </div>
+
+    <div class="card full-width">
+      <div class="card-title"><span>💡</span> About This Database</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;font-size:13px;color:var(--muted);line-height:1.8;">
+        <div>
+          <p><strong style="color:var(--accent)">Federal ITC (30%)</strong> applies in all 50 states for systems installed through 2032.</p>
+          <p><strong style="color:var(--accent)">State Tax Credits</strong> stack ON TOP of the federal ITC — AZ, UT, NM, NY, HI, SC, MA all have them.</p>
+          <p><strong style="color:var(--accent)">Property Tax Exemptions</strong> mean solar-added home equity is tax-free in most states.</p>
+          <p><strong style="color:var(--accent)">Sales Tax Exemptions</strong> save $600–$1,500 at purchase in AZ, TX, FL, NV, and others.</p>
+        </div>
+        <div>
+          <p><strong style="color:var(--accent)">Utility Rebates</strong> (APS, Xcel, NYSERDA, etc.) add hundreds more for qualifying customers.</p>
+          <p><strong style="color:var(--accent)">15 states tracked</strong> with program-specific details and real dollar amounts.</p>
+          <p><strong style="color:var(--accent)">Closing tool</strong> — Show homeowners the FULL incentive stack, not just the 30% ITC.</p>
+          <p style="color:var(--yellow)">⚠️ Always verify with a tax professional. Funding-limited programs change.</p>
+        </div>
+      </div>
+      <div style="margin-top:12px;padding:10px 14px;background:rgba(251,191,36,0.08);border-radius:8px;border-left:3px solid var(--yellow);">
+        <strong style="color:var(--yellow);">💡 PRO TIP:</strong>
+        <span style="color:var(--muted);font-size:13px;"> Most reps only mention the federal 30% ITC. Showing the FULL stack
+        (federal + state + sales tax + property tax + utility rebate) often adds $3,000–$6,000 to the perceived value
+        and dramatically increases close rates. Use the talking points from this lookup on your next door knock.</span>
+      </div>
+    </div>
+  </div>
+
   <div id="tab-about" class="panel">
     <div class="grid-2">
+      <div class="card">
         <div class="card-title"><span>🔬</span> How Lead Enrichment Works</div>
-        <div style="font-size:13px;color:var(--muted);line-height:1.8;">
           <p><strong style="color:var(--accent)">1. Geocoding</strong> — Address → precise lat/lng via Google Maps API</p>
           <p><strong style="color:var(--accent)">2. Solar API</strong> — Google's satellite + ML analysis of the exact roof</p>
           <p><strong style="color:var(--accent)">3. Panel Matching</strong> — Picks the right system size for their usage</p>
@@ -1308,6 +1369,10 @@ function renderLead(d) {
         <button id="ghl-push-btn" onclick="doGHLPush('${d.address}', ${d.monthly_bill_used||175})"
                 style="flex:1;min-width:140px;padding:10px;background:#1e293b;border:1px solid #f97316;color:#f97316;border-radius:8px;cursor:pointer;font-size:0.85rem;font-weight:600;">
           🚀 Push to GHL CRM
+        </button>
+        <button onclick="openIncentivesForLead('${d.state||'AZ'}', ${d.gross_cost_usd||20000}, ${d.system_size_kw||6})"
+                style="flex:1;min-width:140px;padding:10px;background:#1e293b;border:1px solid #facc15;color:#facc15;border-radius:8px;cursor:pointer;font-size:0.85rem;font-weight:600;">
+          🏛️ Incentives Stack
         </button>
       </div>
       <div id="ghl-push-result" style="margin-top:10px;font-size:0.82rem;"></div>
@@ -1957,6 +2022,153 @@ function pushToGHL(address, bill, firstName, lastName) {
                               first_name: firstName||'Solar', last_name: lastName||'Lead' }),
   }).then(r => r.json());
 }
+// ── Incentives Database Tab ───────────────────────────────────────────────────
+async function loadIncentives() {
+  const stateEl   = document.getElementById('inc-state');
+  const costEl    = document.getElementById('inc-cost');
+  const kwEl      = document.getElementById('inc-kw');
+  const addressEl = document.getElementById('inc-address');
+  const resEl     = document.getElementById('incentives-result');
+
+  const state   = stateEl.value.trim().toUpperCase();
+  const cost    = parseFloat(costEl.value) || 20000;
+  const kw      = parseFloat(kwEl.value)   || 6.0;
+  const address = addressEl.value.trim();
+
+  if (!state && !address) {
+    alert('Enter a state code or address.');
+    return;
+  }
+
+  resEl.style.display = 'block';
+  resEl.innerHTML = '<div style="color:var(--muted);padding:20px;text-align:center;">⏳ Looking up incentives…</div>';
+
+  const params = new URLSearchParams({ gross_cost: cost, system_kw: kw });
+  if (state)   params.append('state', state);
+  if (address) params.append('address', address);
+
+  try {
+    const r   = await fetch('/api/incentives?' + params);
+    const d   = await r.json();
+    renderIncentivesResult(d);
+  } catch(e) {
+    resEl.innerHTML = `<div style="color:var(--red);padding:16px;">Error: ${e.message}</div>`;
+  }
+}
+
+function renderIncentivesResult(d) {
+  const resEl = document.getElementById('incentives-result');
+  const federal = d.total_federal_usd || 0;
+  const state   = d.total_state_usd   || 0;
+  const total   = d.total_savings_usd || 0;
+  const net     = d.net_cost_after_incentives || 0;
+  const disc    = d.effective_discount_pct || 0;
+  const gross   = d.gross_cost_usd || 0;
+
+  const barFilled = Math.round(disc / 100 * 40);
+  const bar = '█'.repeat(barFilled) + '░'.repeat(40 - barFilled);
+
+  let incHtml = '';
+
+  // Federal
+  for (const inc of (d.federal_incentives || [])) {
+    const usdStr = inc.incentive_usd > 0 ? `$${Math.round(inc.incentive_usd).toLocaleString()}` : 'See note';
+    incHtml += `
+      <div style="padding:12px;background:rgba(16,185,129,0.08);border-radius:8px;border-left:3px solid var(--green);margin-bottom:8px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <strong style="color:var(--text);">✅ ${inc.name}</strong>
+          <span style="font-size:1.2rem;font-weight:800;color:var(--green);">${usdStr}</span>
+        </div>
+        <div style="font-size:12px;color:var(--muted);margin-top:4px;">${inc.type} | Expires: ${inc.expires || 'ongoing'}</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:4px;">${(inc.description || '').substring(0, 120)}…</div>
+        ${inc.talking_point_formatted ? `<div style="margin-top:6px;font-size:12px;color:var(--accent);font-style:italic;">"${inc.talking_point_formatted}"</div>` : ''}
+      </div>`;
+  }
+
+  // State
+  for (const inc of (d.state_incentives || [])) {
+    const usdStr = inc.incentive_usd > 0 ? `$${Math.round(inc.incentive_usd).toLocaleString()}` : 'Informational';
+    const cond = inc.conditional ? ' <span style="color:var(--yellow);font-size:11px;">⚠ conditional</span>' : '';
+    incHtml += `
+      <div style="padding:12px;background:rgba(251,191,36,0.06);border-radius:8px;border-left:3px solid var(--yellow);margin-bottom:8px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <strong style="color:var(--text);">✅ ${inc.name}${cond}</strong>
+          <span style="font-size:1.1rem;font-weight:700;color:var(--yellow);">${usdStr}</span>
+        </div>
+        <div style="font-size:12px;color:var(--muted);margin-top:4px;">${inc.type} | ${inc.authority || ''}</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:4px;">${(inc.description || '').substring(0, 130)}…</div>
+        ${inc.talking_point_formatted ? `<div style="margin-top:6px;font-size:12px;color:var(--accent);font-style:italic;">"${inc.talking_point_formatted}"</div>` : ''}
+        ${inc.reference ? `<div style="margin-top:4px;font-size:11px;color:var(--muted);">📖 ${inc.reference}</div>` : ''}
+      </div>`;
+  }
+
+  if (!d.has_state_incentives) {
+    incHtml += `<div style="padding:12px;background:rgba(100,116,139,0.1);border-radius:8px;color:var(--muted);font-size:13px;">
+      ℹ️ No additional state incentives tracked for <strong>${d.state}</strong>. Federal ITC still applies.
+    </div>`;
+  }
+
+  resEl.innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px;">
+      <div style="text-align:center;padding:14px;background:rgba(16,185,129,0.08);border-radius:10px;">
+        <div style="font-size:12px;color:var(--muted);">Federal Savings</div>
+        <div style="font-size:1.5rem;font-weight:800;color:var(--green);">$${Math.round(federal).toLocaleString()}</div>
+      </div>
+      <div style="text-align:center;padding:14px;background:rgba(251,191,36,0.08);border-radius:10px;">
+        <div style="font-size:12px;color:var(--muted);">State Savings</div>
+        <div style="font-size:1.5rem;font-weight:800;color:var(--yellow);">$${Math.round(state).toLocaleString()}</div>
+      </div>
+      <div style="text-align:center;padding:14px;background:rgba(99,102,241,0.1);border-radius:10px;">
+        <div style="font-size:12px;color:var(--muted);">Total Savings</div>
+        <div style="font-size:1.5rem;font-weight:800;color:var(--accent);">$${Math.round(total).toLocaleString()}</div>
+      </div>
+      <div style="text-align:center;padding:14px;background:rgba(30,41,59,0.8);border-radius:10px;">
+        <div style="font-size:12px;color:var(--muted);">Net Cost</div>
+        <div style="font-size:1.5rem;font-weight:800;color:var(--text);">$${Math.round(net).toLocaleString()}</div>
+      </div>
+    </div>
+    <div style="margin-bottom:16px;font-family:monospace;font-size:13px;color:var(--accent);">
+      ${disc.toFixed(0)}% off: [${bar}]
+    </div>
+    <div style="margin-bottom:16px;">${incHtml}</div>
+    <div style="font-size:11px;color:var(--muted);padding:8px;border-top:1px solid rgba(255,255,255,0.06);">
+      ${d.disclaimer || ''}
+    </div>`;
+}
+
+async function loadIncentiveStates() {
+  const panel = document.getElementById('incentives-states-panel');
+  const list  = document.getElementById('incentives-states-list');
+  panel.style.display = 'block';
+  list.innerHTML = '<div style="color:var(--muted);padding:12px;">⏳ Loading…</div>';
+
+  try {
+    const r = await fetch('/api/incentives/states');
+    const d = await r.json();
+    let html = `<div style="font-size:13px;color:var(--muted);margin-bottom:12px;">${d.total_states_tracked} states with tracked state incentives (Federal ITC applies in all 50).</div>`;
+    html += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">';
+    for (const s of (d.states_with_incentives || [])) {
+      html += `<div style="padding:10px;background:rgba(99,102,241,0.08);border-radius:8px;cursor:pointer;" onclick="document.getElementById('inc-state').value='${s.state}';loadIncentives();">
+        <div style="font-weight:700;color:var(--accent);">${s.state}</div>
+        <div style="font-size:11px;color:var(--muted);">${s.program_count} program(s)</div>
+        <div style="font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${(s.programs || []).join(', ').substring(0, 50)}</div>
+      </div>`;
+    }
+    html += '</div>';
+    list.innerHTML = html;
+  } catch(e) {
+    list.innerHTML = `<div style="color:var(--red);">Error: ${e.message}</div>`;
+  }
+}
+
+function openIncentivesForLead(state, grossCost, kw) {
+  switchTab('incentives');
+  if (state) document.getElementById('inc-state').value = state.toUpperCase();
+  if (grossCost) document.getElementById('inc-cost').value = grossCost;
+  if (kw) document.getElementById('inc-kw').value = kw;
+  setTimeout(loadIncentives, 100);
+}
+
 </script>
 </body>
 </html>
