@@ -924,5 +924,369 @@ async def leads_map_geojson():
     }
 
 
+# ── Cost of Waiting API ───────────────────────────────────────────────────────
+try:
+    from scripts.cost_of_waiting import calculate_waiting_cost as _calc_waiting
+    _waiting_enabled = True
+except Exception:
+    _waiting_enabled = False
+
+class WaitingCostRequest(BaseModel):
+    address:     Optional[str]   = None
+    monthly_bill: float          = 175.0
+    utility_rate: float          = 0.14
+    months:       int            = 24
+    escalation:   float          = 0.035
+    enrich:       bool           = True
+
+@app.post("/api/lead/waiting-cost",
+    summary="Cost of Waiting Calculator",
+    tags=["Lead Intelligence"])
+async def lead_waiting_cost(req: WaitingCostRequest):
+    """
+    Calculate the financial cost of delaying solar adoption.
+    Returns per-month breakdown, bill escalation projections, and closing talking points.
+
+    If `address` is provided and `enrich=true`, runs full Solar API enrichment first.
+    Otherwise uses bill-only estimates.
+    """
+    if not _waiting_enabled:
+        raise HTTPException(status_code=503, detail="Cost of waiting module unavailable.")
+
+    lead = {}
+    if req.address and req.enrich:
+        try:
+            lead = enrich_lead(req.address, req.monthly_bill, req.utility_rate)
+        except Exception as e:
+            lead = {}
+
+    waiting = _calc_waiting(
+        monthly_bill            = req.monthly_bill,
+        annual_savings_yr1      = lead.get("annual_savings_yr1_usd"),
+        net_system_cost         = lead.get("net_cost_usd"),
+        payback_years           = lead.get("payback_years"),
+        months_to_evaluate      = min(req.months, 36),
+        utility_rate_escalation = req.escalation,
+        system_size_kw          = lead.get("system_size_kw"),
+        panels                  = lead.get("panels_recommended"),
+    )
+
+    return {
+        "address":      req.address,
+        "lead":         lead,
+        "waiting_cost": waiting,
+    }
+
+
+@app.get("/api/lead/waiting-cost",
+    summary="Cost of Waiting (quick GET)",
+    tags=["Lead Intelligence"])
+async def lead_waiting_cost_get(
+    address:      Optional[str] = Query(None),
+    monthly_bill: float         = Query(175.0),
+    utility_rate: float         = Query(0.14),
+    months:       int           = Query(24),
+):
+    """Quick GET version — no request body needed. Enrich by default if address given."""
+    if not _waiting_enabled:
+        raise HTTPException(status_code=503, detail="Cost of waiting module unavailable.")
+
+    lead = {}
+    if address:
+        try:
+            lead = enrich_lead(address, monthly_bill, utility_rate)
+        except Exception:
+            lead = {}
+
+    waiting = _calc_waiting(
+        monthly_bill            = monthly_bill,
+        annual_savings_yr1      = lead.get("annual_savings_yr1_usd"),
+        net_system_cost         = lead.get("net_cost_usd"),
+        payback_years           = lead.get("payback_years"),
+        months_to_evaluate      = min(months, 36),
+        system_size_kw          = lead.get("system_size_kw"),
+        panels                  = lead.get("panels_recommended"),
+    )
+
+    return {
+        "address":      address,
+        "lead":         lead,
+        "waiting_cost": waiting,
+    }
+
+
+@app.get("/api/lead/waiting-cost/widget",
+    response_class=HTMLResponse,
+    summary="Embeddable Cost of Waiting widget (HTML)",
+    tags=["Lead Intelligence"])
+async def waiting_cost_widget(
+    bill:         float         = Query(175.0, description="Monthly electric bill"),
+    address:      Optional[str] = Query(None, description="Pre-fill address"),
+    primary_color:str           = Query("f97316", description="Brand color hex (no #)"),
+    company:      str           = Query("Elevate Solar", description="Company name"),
+    phone:        str           = Query("", description="Company phone"),
+):
+    """
+    Returns a fully standalone embeddable HTML widget showing Cost of Waiting.
+    Embed on any website with: <iframe src='/api/lead/waiting-cost/widget?bill=175' ...>
+    Or serve directly as a landing page / popup.
+    """
+    widget_html = _build_waiting_widget(
+        monthly_bill  = bill,
+        address       = address or "",
+        primary_color = primary_color,
+        company_name  = company,
+        company_phone = phone,
+    )
+    return HTMLResponse(content=widget_html)
+
+
+def _build_waiting_widget(
+    monthly_bill: float,
+    address: str = "",
+    primary_color: str = "f97316",
+    company_name: str = "Elevate Solar",
+    company_phone: str = "",
+) -> str:
+    """Build a standalone embeddable HTML Cost of Waiting widget."""
+    pc = primary_color.lstrip("#")
+
+    address_val = address.replace('"', '&quot;')
+
+    if company_phone:
+        cta_button = "<a href='tel:" + company_phone + "' class='cta-btn'>Call " + company_phone + " Now</a>"
+    else:
+        cta_button = "<button class='cta-btn' onclick=\"alert('Contact " + company_name + " to get started!')\">Get My Free Quote &rarr;</button>"
+
+    bill_val = f"{monthly_bill:.0f}"
+
+    # Build HTML using string concatenation (no f-string backslash issues)
+    parts = []
+    parts.append("<!DOCTYPE html>\n<html lang='en'>\n<head>\n")
+    parts.append("<meta charset='UTF-8'>\n")
+    parts.append("<meta name='viewport' content='width=device-width, initial-scale=1.0'>\n")
+    parts.append(f"<title>Cost of Waiting &mdash; {company_name}</title>\n")
+    parts.append("""<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+         background: #0f172a; color: #e2e8f0; min-height: 100vh; }
+  .widget { max-width: 680px; margin: 0 auto; padding: 24px 16px; }
+  .hero { background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+          border: 1px solid #334155; border-radius: 16px; padding: 28px 24px 20px;
+          text-align: center; margin-bottom: 20px; }
+  .hero-sun { font-size: 2.4rem; margin-bottom: 8px; }
+  .hero h1 { font-size: 1.5rem; font-weight: 800; color: #fff; margin-bottom: 4px; }
+  .hero p  { color: #94a3b8; font-size: 0.9rem; }
+  .calc-card { background: #1e293b; border: 1px solid #334155; border-radius: 12px;
+               padding: 20px; margin-bottom: 16px; }
+  .calc-card h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.1em;
+                  color: #64748b; margin-bottom: 14px; }
+  .input-row { display: flex; gap: 12px; flex-wrap: wrap; }
+  .input-group { flex: 1; min-width: 180px; }
+  .input-group label { display: block; font-size: 0.78rem; color: #94a3b8; margin-bottom: 5px; }
+  .input-group input { width: 100%; background: #0f172a; border: 1px solid #334155;
+                       color: #e2e8f0; padding: 9px 12px; border-radius: 8px; font-size: 0.95rem; }
+  .calc-btn { width: 100%; margin-top: 14px; padding: 12px; color: #fff;
+              border: none; border-radius: 10px; font-size: 1rem;
+              font-weight: 700; cursor: pointer; transition: opacity 0.15s; }
+  .calc-btn:hover { opacity: 0.85; }
+  .calc-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .cost-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;
+               margin-bottom: 16px; }
+  .cost-card { background: #1e293b; border: 1px solid #334155; border-radius: 12px;
+               padding: 16px; text-align: center; }
+  .cost-card .label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em;
+                      color: #64748b; margin-bottom: 4px; }
+  .cost-card .amount { font-size: 1.6rem; font-weight: 800; }
+  .cost-card .amount.danger  { color: #ef4444; }
+  .cost-card .amount.warning { color: #f97316; }
+  .cost-card .sub { font-size: 0.72rem; color: #64748b; margin-top: 3px; }
+  .table-card { background: #1e293b; border: 1px solid #334155; border-radius: 12px;
+                padding: 18px; margin-bottom: 16px; }
+  .table-card h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.1em;
+                   color: #64748b; margin-bottom: 12px; }
+  .esc-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  .esc-table th { color: #64748b; font-size: 0.72rem; text-transform: uppercase;
+                  letter-spacing: 0.06em; padding: 4px 8px; text-align: right; border-bottom: 1px solid #334155; }
+  .esc-table th:first-child { text-align: left; }
+  .esc-table td { padding: 7px 8px; text-align: right; border-bottom: 1px solid #1e293b; }
+  .esc-table td:first-child { text-align: left; color: #94a3b8; }
+  .esc-table tr.hl td { color: #ef4444; font-weight: 700; }
+  .esc-table tr:last-child td { border-bottom: none; }
+  .points-card { background: #1e293b; border: 1px solid #334155; border-radius: 12px;
+                 padding: 18px; margin-bottom: 16px; }
+  .points-card h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.1em;
+                    color: #64748b; margin-bottom: 12px; }
+  .point { display: flex; gap: 10px; margin-bottom: 10px; align-items: flex-start; }
+  .point-icon { font-size: 1rem; flex-shrink: 0; }
+  .point-text { font-size: 0.85rem; color: #cbd5e1; line-height: 1.5; }
+  .cta { border-radius: 12px; padding: 20px; text-align: center; margin-bottom: 16px; }
+  .cta h3 { font-size: 1rem; font-weight: 700; color: #fff; margin-bottom: 6px; }
+  .cta p  { font-size: 0.82rem; color: #94a3b8; margin-bottom: 14px; }
+  .cta-btn { display: inline-block; color: #fff; padding: 12px 28px;
+             border-radius: 8px; font-weight: 700; font-size: 0.95rem; text-decoration: none;
+             cursor: pointer; border: none; }
+  .loading { text-align: center; padding: 16px; color: #64748b; font-size: 0.85rem; display: none; }
+  .footer { text-align: center; font-size: 0.72rem; color: #475569; padding-top: 8px; }
+  .hidden { display: none !important; }
+  .fadeIn { animation: fadeIn 0.3s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+</style>\n""")
+    parts.append("</head>\n<body>\n<div class='widget'>\n")
+    parts.append(f"""
+  <div class='hero'>
+    <div class='hero-sun'>&#9728;&#65039;</div>
+    <h1>What Does <span style='color:#{pc}'>Waiting</span> Cost You?</h1>
+    <p>Every month without solar is money you'll never get back. See your real numbers.</p>
+  </div>
+  <div class='calc-card'>
+    <h2>&#9889; Your Numbers</h2>
+    <div class='input-row'>
+      <div class='input-group'>
+        <label>Monthly Electric Bill ($)</label>
+        <input type='number' id='bill' value='{bill_val}' min='50' max='1000' step='5'
+               style='background:#0f172a;border:1px solid #334155;color:#e2e8f0;'>
+      </div>
+      <div class='input-group'>
+        <label>Your Address (optional)</label>
+        <input type='text' id='address' placeholder='123 Main St, Phoenix AZ' value='{address_val}'
+               style='background:#0f172a;border:1px solid #334155;color:#e2e8f0;'>
+      </div>
+    </div>
+    <button class='calc-btn' id='calcBtn' onclick='runCalc()'
+            style='background:#{pc}'>Calculate My Cost of Waiting &rarr;</button>
+  </div>
+  <div class='loading' id='loading'>&#9203; Analyzing your home's solar potential...</div>
+  <div id='results' class='hidden'>
+    <div class='cost-grid fadeIn' id='costGrid'></div>
+    <div class='table-card fadeIn'>
+      <h2>&#128200; Your Electric Bill Without Solar</h2>
+      <table class='esc-table'>
+        <thead><tr><th>Year</th><th>Monthly</th><th>Annual</th><th>Extra Cost</th></tr></thead>
+        <tbody id='escBody'></tbody>
+      </table>
+      <p style='font-size:0.72rem;color:#475569;margin-top:8px;'>
+        Based on 3.5% average annual utility rate escalation (EIA national average)
+      </p>
+    </div>
+    <div class='points-card fadeIn'>
+      <h2>&#128161; Your Solar Opportunity</h2>
+      <div id='pointsList'></div>
+    </div>
+    <div class='cta fadeIn' style='background:linear-gradient(135deg,#{pc}22,#{pc}11);border:1px solid #{pc}44;'>
+      <h3>Don't Give the Utility More Money &mdash; Go Solar Today</h3>
+      <p>Lock in your savings before rates climb further. Free analysis, no commitment.</p>
+      <span style='display:inline-block;background:#{pc};border-radius:8px;padding:2px 0;'>{cta_button}</span>
+    </div>
+  </div>
+  <div class='footer'>Powered by {company_name} Solar Intelligence Suite &bull;
+    Estimates based on Google Solar API + EIA utility data</div>
+</div>
+""")
+
+    # JavaScript (no f-string needed — static JS)
+    parts.append("""<script>
+async function runCalc() {
+  const bill    = parseFloat(document.getElementById('bill').value) || 175;
+  const address = document.getElementById('address').value.trim();
+  const btn     = document.getElementById('calcBtn');
+  const loading = document.getElementById('loading');
+  btn.disabled = true; btn.textContent = 'Calculating...';
+  loading.style.display = 'block';
+  document.getElementById('results').classList.add('hidden');
+  try {
+    let data;
+    if (address) {
+      const params = new URLSearchParams({ address, monthly_bill: bill });
+      const resp = await fetch('/api/lead/waiting-cost?' + params);
+      data = await resp.json();
+    } else { data = buildBillOnly(bill); }
+    renderResults(data, bill);
+    document.getElementById('results').classList.remove('hidden');
+    document.getElementById('results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  } catch(e) {
+    const data = buildBillOnly(bill);
+    renderResults(data, bill);
+    document.getElementById('results').classList.remove('hidden');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Recalculate';
+    loading.style.display = 'none';
+  }
+}
+
+function buildBillOnly(bill) {
+  const esc = 0.035, syr = bill * 12 * 0.72, smo = syr / 12;
+  const kw = Math.max(4, (bill / 175) * 7.5), nc = kw * 3000 * 0.70, itc = kw * 3000 * 0.30;
+  const bd = [], opts = [3, 6, 12, 18, 24];
+  for (const m of opts) {
+    let elec = 0, lost = 0;
+    for (let i = 1; i <= m; i++) {
+      elec += bill * Math.pow(1 + esc, i/12);
+      if (i > 2) lost += smo * Math.pow(1 + esc, (i-2)/12);
+    }
+    bd.push({ months: m, electricity_paid_usd: elec, lost_solar_savings_usd: lost, total_cost_of_waiting_usd: elec + lost });
+  }
+  const t12 = bd.find(d => d.months === 12) || bd[bd.length - 1];
+  return { waiting_cost: { monthly_bill: bill, annual_savings_yr1_usd: syr, net_system_cost_usd: nc,
+    payback_years: nc / syr, monthly_savings_usd: smo, itc_amount_usd: itc, itc_pct: 0.30,
+    utility_rate_escalation: esc, twelve_month_summary: t12, monthly_breakdown: bd,
+    talking_points: [
+      'Every month you wait costs $' + Math.round(smo) + ' in savings you never get back.',
+      'Over 12 months, you will pay $' + Math.round(bill * 12) + ' to the utility that solar would eliminate.',
+      'Waiting 12 months costs $' + Math.round(t12.total_cost_of_waiting_usd) + ' total.',
+      'At 3.5%/yr escalation, your bill grows to $' + Math.round(bill * 1.035) + '/mo next year.',
+      'The 30% federal ITC saves you $' + Math.round(itc) + ' — that incentive exists now.',
+      'Your system pays back in ' + (nc / syr).toFixed(1) + ' years, then 15+ years of free power.',
+    ] }, lead: {} };
+}
+
+function fmt(n) { return '$' + Math.round(n).toLocaleString(); }
+
+function renderResults(data, bill) {
+  const w = data.waiting_cost, bd = w.monthly_breakdown || [], twl = w.twelve_month_summary || {};
+  const m3 = bd.find(d => d.months === 3) || {}, m6 = bd.find(d => d.months === 6) || {};
+  const m24 = bd.find(d => d.months === 24) || {};
+  document.getElementById('costGrid').innerHTML =
+    card('Cost of Waiting 3 Mo', m3.total_cost_of_waiting_usd, m3.electricity_paid_usd, m3.lost_solar_savings_usd, 'warning') +
+    card('Cost of Waiting 6 Mo', m6.total_cost_of_waiting_usd, m6.electricity_paid_usd, m6.lost_solar_savings_usd, 'warning') +
+    card('&#9888; 12 Months Cost', twl.total_cost_of_waiting_usd, twl.electricity_paid_usd, twl.lost_solar_savings_usd, 'danger') +
+    card('Cost of Waiting 24 Mo', m24.total_cost_of_waiting_usd, m24.electricity_paid_usd, m24.lost_solar_savings_usd, 'danger');
+  const esc = w.utility_rate_escalation || 0.035;
+  const yrs = [['Now',0],['Year 1',1],['Year 2',2],['Year 5',5],['Year 10',10],['Year 20',20]];
+  document.getElementById('escBody').innerHTML = yrs.map(([yr, n]) => {
+    const mo = bill * Math.pow(1+esc, n), ann = mo * 12, extra = mo - bill;
+    const hl = (n >= 10) ? " class='hl'" : '';
+    return "<tr" + hl + "><td>" + yr + "</td><td>" + fmt(mo) + "/mo</td><td>" + fmt(ann) + "/yr</td><td>+" + fmt(extra) + "</td></tr>";
+  }).join('');
+  const icons = ['&#128184;','&#128202;','&#9889;','&#128200;','&#127963;','&#128262;','&#127919;'];
+  document.getElementById('pointsList').innerHTML = (w.talking_points || []).map((pt, i) =>
+    "<div class='point'><span class='point-icon'>" + icons[i % icons.length] + "</span>" +
+    "<span class='point-text'>" + pt + "</span></div>"
+  ).join('');
+}
+
+function card(label, total, elec, lost, cls) {
+  return "<div class='cost-card'>" +
+    "<div class='label'>" + label + "</div>" +
+    "<div class='amount " + cls + "'>" + fmt(total || 0) + "</div>" +
+    "<div class='sub'>" + fmt(elec || 0) + " bills + " + fmt(lost || 0) + " lost savings</div>" +
+    "</div>";
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  const bill = parseFloat(document.getElementById('bill').value);
+  if (bill > 0 && !document.getElementById('address').value) {
+    const data = buildBillOnly(bill);
+    renderResults(data, bill);
+    document.getElementById('results').classList.remove('hidden');
+  }
+});
+</script>
+</body>
+</html>""")
+
+    return "".join(parts)
+
+
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8765)

@@ -155,6 +155,7 @@
     <div class="tab" onclick="switchTab('followup')">💬 Follow-Up Sequences</div>
     <div class="tab" onclick="switchTab('territory-report')">📊 Territory Reports</div>
     <div class="tab" onclick="switchTab('lead-map')">🗺️ Lead Map</div>
+    <div class="tab" onclick="switchTab('waiting-cost')">⏳ Cost of Waiting</div>
     <div class="tab" onclick="switchTab('about')">📖 How It Works</div>
   </div>
 
@@ -592,9 +593,85 @@
     </div>
   </div>
 
+  <!-- COST OF WAITING PANEL -->
+  <div id="tab-waiting-cost" class="panel">
+    <div class="grid-2">
+      <div>
+        <!-- Input Card -->
+        <div class="card" style="margin-bottom:16px;">
+          <div class="card-title"><span>⏳</span> Cost of Waiting Calculator</div>
+          <div style="font-size:0.82rem;color:var(--muted);margin-bottom:14px;">
+            Show homeowners the real dollar cost of delaying solar — closing tool for objection handling.
+          </div>
+          <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
+            <div style="flex:1;min-width:140px;">
+              <label style="display:block;font-size:0.75rem;color:var(--muted);margin-bottom:4px;">Monthly Electric Bill ($)</label>
+              <input id="wc-bill" type="number" value="175" min="50" max="1000"
+                     style="width:100%;background:#0f172a;border:1px solid #334155;color:#e2e8f0;padding:8px 10px;border-radius:8px;font-size:0.9rem;">
+            </div>
+            <div style="flex:2;min-width:200px;">
+              <label style="display:block;font-size:0.75rem;color:var(--muted);margin-bottom:4px;">Address (optional — for real solar data)</label>
+              <input id="wc-address" type="text" placeholder="1905 E Marquette Dr, Gilbert AZ"
+                     style="width:100%;background:#0f172a;border:1px solid #334155;color:#e2e8f0;padding:8px 10px;border-radius:8px;font-size:0.9rem;">
+            </div>
+          </div>
+          <div style="display:flex;gap:10px;">
+            <button id="wc-calc-btn" onclick="loadWaitingCost()"
+                    style="flex:1;padding:10px;background:#f97316;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;">
+              ⏳ Calculate Cost of Waiting
+            </button>
+            <button onclick="openWaitingWidget()"
+                    style="padding:10px 14px;background:#1e293b;border:1px solid #334155;color:#e2e8f0;border-radius:8px;cursor:pointer;font-size:0.85rem;">
+              🔗 Widget
+            </button>
+          </div>
+        </div>
+
+        <!-- Results -->
+        <div id="wc-results" style="color:#64748b;font-size:0.85rem;padding:8px 0;">
+          Enter a bill amount and click Calculate to see the cost of waiting.
+        </div>
+      </div>
+
+      <!-- How it Works -->
+      <div class="card">
+        <div class="card-title"><span>💡</span> How This Closes Deals</div>
+        <div style="font-size:0.82rem;color:var(--muted);line-height:1.8;">
+          <p style="margin-bottom:10px;">Most homeowners think "I'll think about it" costs them nothing. This tool shows them exactly what that decision costs:</p>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <div style="display:flex;gap:8px;align-items:flex-start;">
+              <span style="color:#f97316;flex-shrink:0">💸</span>
+              <span><strong>Electricity bills:</strong> Every month they keep paying the utility at 3.5%+ annual increases.</span>
+            </div>
+            <div style="display:flex;gap:8px;align-items:flex-start;">
+              <span style="color:#ef4444;flex-shrink:0">⚡</span>
+              <span><strong>Lost savings:</strong> The solar savings they could have been generating, but aren't.</span>
+            </div>
+            <div style="display:flex;gap:8px;align-items:flex-start;">
+              <span style="color:#22c55e;flex-shrink:0">🏛️</span>
+              <span><strong>ITC stability:</strong> The 30% federal tax credit is $6,000–$10,000+ — exists now, policy risk later.</span>
+            </div>
+            <div style="display:flex;gap:8px;align-items:flex-start;">
+              <span style="color:#3b82f6;flex-shrink:0">🔗</span>
+              <span><strong>Shareable widget:</strong> Send the widget link directly to homeowners — they can run it themselves.</span>
+            </div>
+          </div>
+          <div style="background:#1e293b;border:1px solid #f97316;border-radius:8px;padding:12px;margin-top:14px;">
+            <div style="font-size:0.75rem;font-weight:700;color:#f97316;margin-bottom:4px;">PRO TIP 🎯</div>
+            <div style="font-size:0.8rem;">After a "not now" objection, say: "I totally understand — before you decide, can I show you what waiting 12 months actually costs you?" Then pull this up on your phone.</div>
+          </div>
+          <div style="background:#1e293b;border:1px solid #334155;border-radius:8px;padding:12px;margin-top:10px;">
+            <div style="font-size:0.75rem;font-weight:700;color:#64748b;margin-bottom:4px;">EMBED ON YOUR WEBSITE</div>
+            <div style="font-size:0.78rem;color:#94a3b8;">Add to any webpage:</div>
+            <code style="font-size:0.72rem;color:#22c55e;display:block;margin-top:4px;word-break:break-all;">&lt;iframe src="http://localhost:8765/api/lead/waiting-cost/widget?bill=175&company=Elevate+Solar" width="700" height="800" frameborder="0"&gt;&lt;/iframe&gt;</code>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div id="tab-about" class="panel">
     <div class="grid-2">
-      <div class="card">
         <div class="card-title"><span>🔬</span> How Lead Enrichment Works</div>
         <div style="font-size:13px;color:var(--muted);line-height:1.8;">
           <p><strong style="color:var(--accent)">1. Geocoding</strong> — Address → precise lat/lng via Google Maps API</p>
@@ -1467,6 +1544,129 @@ async function loadTerritoryReportPreview() {
   iframe.src = url;
   iframe.onload = () => { btn.textContent = '👁️ Preview Here'; btn.disabled = false; };
   iframe.scrollIntoView({ behavior: 'smooth' });
+}
+
+// ── Cost of Waiting Tab ──────────────────────────────────────────────────────
+function openWaitingWidget() {
+  const bill = document.getElementById('wc-bill').value || 175;
+  const addr = document.getElementById('wc-address').value.trim();
+  const params = new URLSearchParams({
+    bill: bill,
+    company: 'Elevate Solar',
+    phone: '',
+  });
+  if (addr) params.set('address', addr);
+  window.open('/api/lead/waiting-cost/widget?' + params, '_blank');
+}
+
+function loadWaitingCost() {
+  const bill = document.getElementById('wc-bill').value || 175;
+  const addr = document.getElementById('wc-address').value.trim();
+  const btn = document.getElementById('wc-calc-btn');
+  const results = document.getElementById('wc-results');
+
+  btn.disabled = true;
+  btn.textContent = 'Calculating...';
+  results.innerHTML = '<div style="color:#64748b;padding:16px;">⏳ Running analysis...</div>';
+
+  const params = new URLSearchParams({ monthly_bill: bill });
+  if (addr) params.set('address', addr);
+
+  fetch('/api/lead/waiting-cost?' + params)
+    .then(r => r.json())
+    .then(data => {
+      const w = data.waiting_cost;
+      const l = data.lead || {};
+      const bd = w.monthly_breakdown || [];
+      const t12 = w.twelve_month_summary || {};
+
+      const m3  = bd.find(d => d.months === 3)  || {};
+      const m6  = bd.find(d => d.months === 6)  || {};
+      const m24 = bd.find(d => d.months === 24) || {};
+
+      function fmt(n) { return '$' + Math.round(n || 0).toLocaleString(); }
+      const esc = w.utility_rate_escalation || 0.035;
+
+      let scoreHtml = '';
+      if (l.lead_score) {
+        const pct = l.lead_score;
+        const col = pct >= 75 ? '#22c55e' : pct >= 55 ? '#f97316' : '#ef4444';
+        scoreHtml = `<div style="background:#1e293b;border:1px solid #334155;border-radius:10px;padding:14px;margin-bottom:12px;">
+          <div style="font-size:0.75rem;color:#64748b;margin-bottom:8px;">THIS HOME'S SOLAR PROFILE</div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center;">
+            <div><div style="font-size:1.2rem;font-weight:800;color:${col}">${l.lead_score}/100</div><div style="font-size:0.7rem;color:#64748b">${l.lead_grade} ${l.priority}</div></div>
+            <div><div style="font-size:1.2rem;font-weight:800;color:#22c55e">${fmt(l.annual_savings_yr1_usd)}/yr</div><div style="font-size:0.7rem;color:#64748b">Year 1 Savings</div></div>
+            <div><div style="font-size:1.2rem;font-weight:800;color:#f97316">${l.payback_years} yrs</div><div style="font-size:0.7rem;color:#64748b">Payback</div></div>
+          </div>
+        </div>`;
+      }
+
+      const tableRows = [
+        ['Now', 0], ['Year 1', 1], ['Year 2', 2], ['Year 5', 5], ['Year 10', 10], ['Year 20', 20]
+      ].map(([yr, n]) => {
+        const mo = bill * Math.pow(1+esc, n);
+        const hl = n >= 10 ? 'color:#ef4444;font-weight:700;' : 'color:#94a3b8;';
+        return `<tr><td style="${hl}">${yr}</td><td style="text-align:right">${fmt(mo)}/mo</td><td style="text-align:right">${fmt(mo*12)}/yr</td><td style="text-align:right;${n>0?'color:#ef4444;':''}">+${fmt(mo-bill)}</td></tr>`;
+      }).join('');
+
+      const ptHtml = (w.talking_points || []).map((pt, i) =>
+        `<div style="display:flex;gap:10px;margin-bottom:8px;align-items:flex-start;">
+          <span style="flex-shrink:0">💸</span>
+          <span style="font-size:0.84rem;color:#cbd5e1;line-height:1.5">${pt}</span>
+        </div>`
+      ).join('');
+
+      results.innerHTML = scoreHtml + `
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:14px;">
+          <div style="background:#1e293b;border:1px solid #334155;border-radius:10px;padding:14px;text-align:center;">
+            <div style="font-size:0.7rem;color:#64748b;text-transform:uppercase;margin-bottom:4px">Wait 3 Months</div>
+            <div style="font-size:1.5rem;font-weight:800;color:#f97316">${fmt(m3.total_cost_of_waiting_usd)}</div>
+            <div style="font-size:0.7rem;color:#64748b">${fmt(m3.electricity_paid_usd)} bills + ${fmt(m3.lost_solar_savings_usd)} lost</div>
+          </div>
+          <div style="background:#1e293b;border:1px solid #334155;border-radius:10px;padding:14px;text-align:center;">
+            <div style="font-size:0.7rem;color:#64748b;text-transform:uppercase;margin-bottom:4px">Wait 6 Months</div>
+            <div style="font-size:1.5rem;font-weight:800;color:#f97316">${fmt(m6.total_cost_of_waiting_usd)}</div>
+            <div style="font-size:0.7rem;color:#64748b">${fmt(m6.electricity_paid_usd)} bills + ${fmt(m6.lost_solar_savings_usd)} lost</div>
+          </div>
+          <div style="background:#1e293b;border:1px solid #f97316;border-radius:10px;padding:14px;text-align:center;">
+            <div style="font-size:0.7rem;color:#f97316;text-transform:uppercase;margin-bottom:4px">⚠ Wait 12 Months</div>
+            <div style="font-size:1.5rem;font-weight:800;color:#ef4444">${fmt(t12.total_cost_of_waiting_usd)}</div>
+            <div style="font-size:0.7rem;color:#64748b">${fmt(t12.electricity_paid_usd)} bills + ${fmt(t12.lost_solar_savings_usd)} lost</div>
+          </div>
+          <div style="background:#1e293b;border:1px solid #334155;border-radius:10px;padding:14px;text-align:center;">
+            <div style="font-size:0.7rem;color:#64748b;text-transform:uppercase;margin-bottom:4px">Wait 24 Months</div>
+            <div style="font-size:1.5rem;font-weight:800;color:#ef4444">${fmt(m24.total_cost_of_waiting_usd)}</div>
+            <div style="font-size:0.7rem;color:#64748b">${fmt(m24.electricity_paid_usd)} bills + ${fmt(m24.lost_solar_savings_usd)} lost</div>
+          </div>
+        </div>
+        <div style="background:#1e293b;border:1px solid #334155;border-radius:10px;padding:16px;margin-bottom:14px;">
+          <div style="font-size:0.75rem;color:#64748b;text-transform:uppercase;margin-bottom:10px;">📈 Bill Escalation Without Solar</div>
+          <table style="width:100%;border-collapse:collapse;font-size:0.84rem;">
+            <thead><tr style="color:#64748b;font-size:0.72rem;">
+              <th style="text-align:left;padding:4px 8px;">Year</th>
+              <th style="text-align:right;padding:4px 8px;">Monthly</th>
+              <th style="text-align:right;padding:4px 8px;">Annual</th>
+              <th style="text-align:right;padding:4px 8px;">Extra</th>
+            </tr></thead>
+            <tbody>${tableRows}</tbody>
+          </table>
+          <div style="font-size:0.7rem;color:#475569;margin-top:8px;">3.5% avg annual utility rate escalation (EIA)</div>
+        </div>
+        <div style="background:#1e293b;border:1px solid #334155;border-radius:10px;padding:16px;margin-bottom:14px;">
+          <div style="font-size:0.75rem;color:#64748b;text-transform:uppercase;margin-bottom:10px;">💡 Closing Talking Points</div>
+          ${ptHtml}
+        </div>
+        <button onclick="openWaitingWidget()" style="width:100%;padding:12px;background:#f97316;color:#fff;border:none;border-radius:10px;font-weight:700;cursor:pointer;font-size:0.95rem;">
+          🔗 Open Shareable Widget (Send to Homeowner)
+        </button>`;
+    })
+    .catch(err => {
+      results.innerHTML = '<div style="color:#ef4444;padding:12px">Error: ' + err + '</div>';
+    })
+    .finally(() => {
+      btn.disabled = false;
+      btn.textContent = '⏳ Calculate Cost of Waiting';
+    });
 }
 </script>
 </body>
