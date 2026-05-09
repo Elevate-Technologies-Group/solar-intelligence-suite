@@ -1912,5 +1912,179 @@ async def door_knock_script_post(request: Request):
     return JSONResponse(result)
 
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# BONUS O — Lead Pipeline CRM
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@app.get("/api/pipeline/leads",
+    summary="List all pipeline leads",
+    tags=["Pipeline CRM"])
+async def pipeline_list(stage: str = None, limit: int = 100):
+    """List leads in the pipeline, optionally filtered by stage."""
+    try:
+        from scripts.pipeline import PipelineCRM
+        crm = PipelineCRM()
+        leads = crm.list_leads(stage=stage, limit=limit)
+        return JSONResponse({"leads": leads, "count": len(leads)})
+    except Exception as e:
+        raise HTTPException(500, f"Pipeline error: {e}")
+
+
+@app.post("/api/pipeline/leads",
+    summary="Add a lead to the pipeline",
+    tags=["Pipeline CRM"])
+async def pipeline_add(request: Request):
+    """
+    Add a new lead to the pipeline.
+
+    Body:
+        address (str): Property address
+        contact_name (str): Homeowner name
+        phone (str): Phone number
+        email (str): Email
+        monthly_bill (float): Average electric bill
+        enrich (bool): Whether to call Solar API (default true)
+        source (str): Lead source label
+    """
+    try:
+        from scripts.pipeline import PipelineCRM
+        crm = PipelineCRM()
+    except Exception as e:
+        raise HTTPException(503, f"Pipeline module unavailable: {e}")
+
+    body = await request.json()
+    address = body.get("address", "")
+    lead_id = crm.add_lead(
+        address=address,
+        contact_name=body.get("contact_name", ""),
+        phone=body.get("phone", ""),
+        email=body.get("email", ""),
+        monthly_bill=float(body.get("monthly_bill", 0)),
+        enrich=body.get("enrich", True),
+        source=body.get("source", "api"),
+    )
+    lead = crm.get_lead(lead_id)
+    return JSONResponse({"ok": True, "lead_id": lead_id, "lead": lead})
+
+
+@app.get("/api/pipeline/leads/{lead_id}",
+    summary="Get a single pipeline lead",
+    tags=["Pipeline CRM"])
+async def pipeline_get_lead(lead_id: int):
+    """Get full detail for a single lead including notes and stage history."""
+    try:
+        from scripts.pipeline import PipelineCRM
+        crm = PipelineCRM()
+        lead = crm.get_lead(lead_id)
+        if not lead:
+            raise HTTPException(404, f"Lead #{lead_id} not found")
+        return JSONResponse(lead)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"Pipeline error: {e}")
+
+
+@app.post("/api/pipeline/leads/{lead_id}/move",
+    summary="Move lead to a new stage",
+    tags=["Pipeline CRM"])
+async def pipeline_move(lead_id: int, request: Request):
+    """
+    Advance or change a lead's pipeline stage.
+
+    Body:
+        stage (str): One of new, contacted, qualified, proposed, closed_won, closed_lost
+    """
+    try:
+        from scripts.pipeline import PipelineCRM, STAGES
+        crm = PipelineCRM()
+    except Exception as e:
+        raise HTTPException(503, f"Pipeline module unavailable: {e}")
+
+    body = await request.json()
+    stage = body.get("stage", "")
+    if stage not in STAGES:
+        raise HTTPException(400, f"Invalid stage '{stage}'. Valid: {STAGES}")
+    ok = crm.move_stage(lead_id, stage)
+    if not ok:
+        raise HTTPException(404, f"Lead #{lead_id} not found")
+    return JSONResponse({"ok": True, "lead_id": lead_id, "new_stage": stage})
+
+
+@app.post("/api/pipeline/leads/{lead_id}/note",
+    summary="Add a note to a pipeline lead",
+    tags=["Pipeline CRM"])
+async def pipeline_note(lead_id: int, request: Request):
+    """
+    Add a note/activity log entry to a lead.
+
+    Body:
+        note (str): Note text
+        author (str): Rep name/identifier (default: 'rep')
+    """
+    try:
+        from scripts.pipeline import PipelineCRM
+        crm = PipelineCRM()
+    except Exception as e:
+        raise HTTPException(503, f"Pipeline module unavailable: {e}")
+
+    body = await request.json()
+    note = body.get("note", "").strip()
+    if not note:
+        raise HTTPException(400, "note cannot be empty")
+    ok = crm.add_note(lead_id, note, author=body.get("author", "rep"))
+    if not ok:
+        raise HTTPException(404, f"Lead #{lead_id} not found")
+    return JSONResponse({"ok": True, "lead_id": lead_id})
+
+
+@app.post("/api/pipeline/leads/{lead_id}/deal",
+    summary="Set deal value for a lead",
+    tags=["Pipeline CRM"])
+async def pipeline_deal(lead_id: int, request: Request):
+    """Set the expected/actual deal value in dollars for a lead."""
+    try:
+        from scripts.pipeline import PipelineCRM
+        crm = PipelineCRM()
+        body = await request.json()
+        value = float(body.get("value", 0))
+        ok = crm.set_deal_value(lead_id, value)
+        if not ok:
+            raise HTTPException(404, f"Lead #{lead_id} not found")
+        return JSONResponse({"ok": True, "lead_id": lead_id, "deal_value": value})
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"Pipeline error: {e}")
+
+
+@app.get("/api/pipeline/stats",
+    summary="Pipeline summary statistics",
+    tags=["Pipeline CRM"])
+async def pipeline_stats():
+    """Get counts, average scores, and revenue by pipeline stage."""
+    try:
+        from scripts.pipeline import PipelineCRM
+        crm = PipelineCRM()
+        return JSONResponse(crm.stats())
+    except Exception as e:
+        raise HTTPException(500, f"Pipeline error: {e}")
+
+
+@app.post("/api/pipeline/import-cache",
+    summary="Import enriched leads from cache",
+    tags=["Pipeline CRM"])
+async def pipeline_import(max_leads: int = 20):
+    """Scan the cache folder and import quality leads (score ≥ 50) into the pipeline."""
+    try:
+        from scripts.pipeline import PipelineCRM
+        crm = PipelineCRM()
+        n = crm.import_from_cache(max_leads=max_leads)
+        stats = crm.stats()
+        return JSONResponse({"ok": True, "imported": n, "pipeline_stats": stats})
+    except Exception as e:
+        raise HTTPException(500, f"Pipeline import error: {e}")
+
+
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8765)

@@ -160,6 +160,7 @@
     <div class="tab" onclick="switchTab('incentives')">🏛️ Incentives Database</div>
     <div class="tab" onclick="switchTab('objections')">🗣️ Objection Handler</div>
     <div class="tab" onclick="switchTab('door-script')">🚪 Door-Knock Script</div>
+    <div class="tab" onclick="switchTab('pipeline')" id="pipeline-tab">📊 Pipeline CRM</div>
     <div class="tab" onclick="switchTab('about')">📖 How It Works</div>
   </div>
 
@@ -1065,6 +1066,62 @@
           <p><span style="color:var(--green)">POST</span> <span style="color:var(--accent)">/api/lead/door-script</span> — body: {address, monthly_bill}</p>
           <p style="margin-top:8px">Returns full JSON script with all 5 steps, close options, and objection handling — ready for mobile app or GHL integration.</p>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="tab-pipeline" class="panel">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+      <h2 style="color:var(--accent);font-size:20px;">📊 Lead Pipeline CRM</h2>
+      <div style="display:flex;gap:10px;">
+        <button class="btn btn-secondary" style="width:auto;padding:8px 18px;font-size:13px;" onclick="importCacheLeads()">⬆️ Import Cache Leads</button>
+        <button class="btn btn-primary" style="width:auto;padding:8px 18px;font-size:13px;" onclick="loadPipeline()">🔄 Refresh</button>
+      </div>
+    </div>
+
+    <!-- Pipeline Stats Row -->
+    <div id="pipeline-stats-bar" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;">
+      <div class="stat"><div class="stat-value" id="ps-total">—</div><div class="stat-label">Total Leads</div></div>
+      <div class="stat"><div class="stat-value" style="color:var(--green)" id="ps-won">$—</div><div class="stat-label">Won Revenue</div></div>
+      <div class="stat"><div class="stat-value" style="color:var(--accent2)" id="ps-pipeline">$—</div><div class="stat-label">Active Pipeline</div></div>
+      <div class="stat"><div class="stat-value" id="ps-hot">—</div><div class="stat-label">🔥 HOT Leads</div></div>
+    </div>
+
+    <!-- Add Lead Form -->
+    <div class="card" style="margin-bottom:20px;">
+      <div class="card-title"><span>➕</span> Add Lead to Pipeline</div>
+      <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:12px;align-items:end;">
+        <div class="form-group" style="margin:0;">
+          <label>Address</label>
+          <input type="text" id="pl-address" placeholder="123 Main St, Phoenix AZ 85001" />
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label>Contact Name</label>
+          <input type="text" id="pl-name" placeholder="John Smith" />
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label>Phone</label>
+          <input type="text" id="pl-phone" placeholder="480-555-1234" />
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label>Monthly Bill $</label>
+          <input type="number" id="pl-bill" placeholder="175" min="0" />
+        </div>
+      </div>
+      <button class="btn btn-primary" style="margin-top:12px;" id="pl-add-btn" onclick="pipelineAddLead()">➕ Add & Enrich Lead</button>
+      <div id="pl-add-status" style="margin-top:8px;font-size:13px;"></div>
+    </div>
+
+    <!-- Kanban Columns -->
+    <div id="pipeline-kanban" style="display:grid;grid-template-columns:repeat(6,1fr);gap:12px;">
+      <!-- dynamically populated -->
+    </div>
+
+    <!-- Lead Detail Modal -->
+    <div id="pl-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:1000;overflow:auto;">
+      <div style="max-width:640px;margin:40px auto;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:28px;position:relative;">
+        <button onclick="closePipelineModal()" style="position:absolute;top:16px;right:16px;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:6px 14px;cursor:pointer;">✕ Close</button>
+        <div id="pl-modal-content"></div>
       </div>
     </div>
   </div>
@@ -2690,6 +2747,212 @@ function dkDownloadScript() {
   a.href = URL.createObjectURL(blob);
   a.download = `door_knock_script_${(d.address||'').replace(/[^a-z0-9]/gi,'_').toLowerCase()}.txt`;
   a.click();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PIPELINE CRM
+// ═══════════════════════════════════════════════════════════════════════════
+
+const PIPELINE_STAGES = [
+  { id: 'new',          label: 'New',          icon: '🆕', color: '#22d3ee' },
+  { id: 'contacted',    label: 'Contacted',    icon: '📞', color: '#3b82f6' },
+  { id: 'qualified',    label: 'Qualified',    icon: '⚡', color: '#f59e0b' },
+  { id: 'proposed',     label: 'Proposed',     icon: '📋', color: '#a78bfa' },
+  { id: 'closed_won',   label: 'Won ✅',        icon: '✅', color: '#10b981' },
+  { id: 'closed_lost',  label: 'Lost ❌',       icon: '❌', color: '#ef4444' },
+];
+
+async function loadPipeline() {
+  try {
+    const [leadsRes, statsRes] = await Promise.all([
+      fetch('/api/pipeline/leads'),
+      fetch('/api/pipeline/stats'),
+    ]);
+    const leadsData = await leadsRes.json();
+    const statsData = await statsRes.json();
+    renderPipelineKanban(leadsData.leads || []);
+    renderPipelineStats(statsData);
+  } catch(e) {
+    document.getElementById('pipeline-kanban').innerHTML =
+      `<div style="color:var(--red);grid-column:1/-1;">Error loading pipeline: ${e.message}</div>`;
+  }
+}
+
+function renderPipelineStats(stats) {
+  document.getElementById('ps-total').textContent = stats.total_leads || 0;
+  document.getElementById('ps-won').textContent =
+    '$' + Math.round(stats.closed_won_revenue || 0).toLocaleString();
+  document.getElementById('ps-pipeline').textContent =
+    '$' + Math.round(stats.active_pipeline_value || 0).toLocaleString();
+  const hotCount = Object.values(stats.by_stage || {}).reduce((s, st) => s + (st.hot_count || 0), 0);
+  document.getElementById('ps-hot').textContent = hotCount;
+}
+
+function renderPipelineKanban(leads) {
+  const byStage = {};
+  PIPELINE_STAGES.forEach(s => byStage[s.id] = []);
+  leads.forEach(l => { if (byStage[l.stage] !== undefined) byStage[l.stage].push(l); });
+
+  const kanban = document.getElementById('pipeline-kanban');
+  kanban.innerHTML = PIPELINE_STAGES.map(stage => {
+    const items = byStage[stage.id] || [];
+    const cards = items.map(lead => {
+      const score = lead.lead_score || 0;
+      const scoreColor = score >= 75 ? '#10b981' : score >= 50 ? '#f59e0b' : '#ef4444';
+      const prioIcon = lead.priority === 'HOT' ? '🔥' : lead.priority === 'WARM' ? '🌤' : '❄️';
+      const addr = (lead.address || 'Unknown').substring(0, 30);
+      const name = lead.contact_name ? `<div style="font-size:11px;color:#22d3ee;margin-top:2px;">${lead.contact_name}</div>` : '';
+      const bill = lead.monthly_bill ? `<div style="font-size:10px;color:var(--muted);">$${lead.monthly_bill}/mo</div>` : '';
+      return `<div onclick="showPipelineLead(${lead.id})"
+        style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;cursor:pointer;margin-bottom:8px;transition:border-color .2s;"
+        onmouseover="this.style.borderColor='${stage.color}'" onmouseout="this.style.borderColor='var(--border)'">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+          <span style="font-size:10px;color:var(--muted);">#${lead.id}</span>
+          <span style="font-size:11px;font-weight:700;color:${scoreColor};">${score}/100</span>
+        </div>
+        <div style="font-size:12px;color:var(--text);line-height:1.3;">${prioIcon} ${addr}</div>
+        ${name}${bill}
+      </div>`;
+    }).join('');
+
+    return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;">
+      <div style="font-size:12px;font-weight:700;color:${stage.color};margin-bottom:12px;text-transform:uppercase;letter-spacing:.05em;">
+        ${stage.icon} ${stage.label} <span style="color:var(--muted);font-weight:400;">(${items.length})</span>
+      </div>
+      ${cards || '<div style="font-size:11px;color:var(--muted);text-align:center;padding:20px 0;">empty</div>'}
+    </div>`;
+  }).join('');
+}
+
+async function showPipelineLead(leadId) {
+  const res = await fetch(`/api/pipeline/leads/${leadId}`);
+  const lead = await res.json();
+  const stage = PIPELINE_STAGES.find(s => s.id === lead.stage) || {};
+  const scoreColor = (lead.lead_score||0) >= 75 ? '#10b981' : (lead.lead_score||0) >= 50 ? '#f59e0b' : '#ef4444';
+
+  const stageButtons = PIPELINE_STAGES.map(s =>
+    `<button onclick="movePipelineLead(${lead.id},'${s.id}')"
+      style="padding:6px 12px;border-radius:6px;border:1px solid ${s.id === lead.stage ? s.color : 'var(--border)'};
+             background:${s.id === lead.stage ? s.color+'22' : 'var(--surface2)'};
+             color:${s.id === lead.stage ? s.color : 'var(--muted)'};cursor:pointer;font-size:12px;"
+    >${s.icon} ${s.label}</button>`
+  ).join('');
+
+  const notes = (lead.notes || []).map(n =>
+    `<div style="background:var(--surface2);border-radius:6px;padding:10px;margin-bottom:8px;">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">${n.created_at.substring(0,16)} · ${n.author}</div>
+      <div style="font-size:13px;">${n.note}</div>
+    </div>`
+  ).join('') || '<div style="color:var(--muted);font-size:13px;">No notes yet.</div>';
+
+  document.getElementById('pl-modal-content').innerHTML = `
+    <h3 style="color:var(--accent);margin-bottom:4px;">Lead #${lead.id}</h3>
+    <div style="color:var(--text);font-size:14px;margin-bottom:16px;">${lead.address}</div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
+      <div class="stat"><div class="stat-value" style="color:${scoreColor}">${lead.lead_score||0}/100</div><div class="stat-label">Lead Score ${lead.lead_grade||''}</div></div>
+      <div class="stat"><div class="stat-value">${lead.priority||'?'}</div><div class="stat-label">Priority</div></div>
+      ${lead.yr1_savings ? `<div class="stat"><div class="stat-value" style="color:var(--green)">$${Math.round(lead.yr1_savings).toLocaleString()}</div><div class="stat-label">Yr1 Savings</div></div>` : ''}
+      ${lead.payback_yrs ? `<div class="stat"><div class="stat-value">${lead.payback_yrs.toFixed(1)}yr</div><div class="stat-label">Payback</div></div>` : ''}
+    </div>
+
+    ${lead.contact_name ? `<div style="margin-bottom:12px;font-size:13px;">👤 <strong>${lead.contact_name}</strong>${lead.phone ? ' · 📞 ' + lead.phone : ''}${lead.email ? ' · ✉️ ' + lead.email : ''}</div>` : ''}
+    ${lead.monthly_bill ? `<div style="margin-bottom:16px;font-size:13px;">💡 Monthly bill: <strong>$${lead.monthly_bill}/mo</strong></div>` : ''}
+
+    <div style="font-size:12px;color:var(--muted);margin-bottom:8px;font-weight:600;">MOVE STAGE</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:20px;">${stageButtons}</div>
+
+    <div style="font-size:12px;color:var(--muted);margin-bottom:8px;font-weight:600;">ADD NOTE</div>
+    <div style="display:flex;gap:8px;margin-bottom:16px;">
+      <input type="text" id="pl-note-text" placeholder="Enter note..." style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-size:13px;" />
+      <button onclick="addPipelineNote(${lead.id})" style="padding:8px 16px;background:var(--accent);color:#000;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px;">Add</button>
+    </div>
+
+    <div style="font-size:12px;color:var(--muted);margin-bottom:8px;font-weight:600;">NOTES (${(lead.notes||[]).length})</div>
+    ${notes}
+
+    <div style="margin-top:16px;display:flex;gap:8px;">
+      <input type="number" id="pl-deal-val" placeholder="Deal value $" style="width:140px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-size:13px;" />
+      <button onclick="setPipelineDeal(${lead.id})" style="padding:8px 16px;background:var(--green);color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px;">💰 Set Deal Value</button>
+    </div>
+  `;
+  document.getElementById('pl-modal').style.display = 'block';
+}
+
+function closePipelineModal() {
+  document.getElementById('pl-modal').style.display = 'none';
+}
+
+async function movePipelineLead(leadId, stage) {
+  await fetch(`/api/pipeline/leads/${leadId}/move`, {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({stage})
+  });
+  closePipelineModal();
+  loadPipeline();
+}
+
+async function addPipelineNote(leadId) {
+  const note = document.getElementById('pl-note-text').value.trim();
+  if (!note) return;
+  await fetch(`/api/pipeline/leads/${leadId}/note`, {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({note})
+  });
+  showPipelineLead(leadId);
+  loadPipeline();
+}
+
+async function setPipelineDeal(leadId) {
+  const val = parseFloat(document.getElementById('pl-deal-val').value) || 0;
+  await fetch(`/api/pipeline/leads/${leadId}/deal`, {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({value: val})
+  });
+  showPipelineLead(leadId);
+  loadPipeline();
+}
+
+async function pipelineAddLead() {
+  const addr = document.getElementById('pl-address').value.trim();
+  if (!addr) { document.getElementById('pl-add-status').innerHTML = '<span style="color:var(--red);">Address required.</span>'; return; }
+  const btn = document.getElementById('pl-add-btn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Enriching…';
+  document.getElementById('pl-add-status').innerHTML = '<span style="color:var(--muted);">Calling Solar API (uses cache)…</span>';
+  try {
+    const res = await fetch('/api/pipeline/leads', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        address: addr,
+        contact_name: document.getElementById('pl-name').value.trim(),
+        phone: document.getElementById('pl-phone').value.trim(),
+        monthly_bill: parseFloat(document.getElementById('pl-bill').value) || 0,
+        enrich: true,
+        source: 'dashboard',
+      })
+    });
+    const data = await res.json();
+    document.getElementById('pl-add-status').innerHTML =
+      `<span style="color:var(--green);">✓ Lead #${data.lead_id} added! Score: ${data.lead?.lead_score||'?'}/100 ${data.lead?.lead_grade||''}</span>`;
+    document.getElementById('pl-address').value = '';
+    document.getElementById('pl-name').value = '';
+    document.getElementById('pl-phone').value = '';
+    document.getElementById('pl-bill').value = '';
+    loadPipeline();
+  } catch(e) {
+    document.getElementById('pl-add-status').innerHTML = `<span style="color:var(--red);">Error: ${e.message}</span>`;
+  }
+  btn.disabled = false;
+  btn.textContent = '➕ Add & Enrich Lead';
+}
+
+async function importCacheLeads() {
+  const res = await fetch('/api/pipeline/import-cache?max_leads=20', {method:'POST'});
+  const data = await res.json();
+  document.getElementById('pl-add-status').innerHTML =
+    `<span style="color:var(--green);">✓ Imported ${data.imported} leads from cache!</span>`;
+  loadPipeline();
 }
 
 </script>
