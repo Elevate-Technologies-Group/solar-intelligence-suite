@@ -158,6 +158,7 @@
     <div class="tab" onclick="switchTab('waiting-cost')">⏳ Cost of Waiting</div>
     <div class="tab" onclick="switchTab('financing')">💳 Financing Calculator</div>
     <div class="tab" onclick="switchTab('incentives')">🏛️ Incentives Database</div>
+    <div class="tab" onclick="switchTab('objections')">🗣️ Objection Handler</div>
     <div class="tab" onclick="switchTab('about')">📖 How It Works</div>
   </div>
 
@@ -825,6 +826,137 @@
     </div>
   </div>
 
+  <!-- ═══════════════════════════════════════════════════════════ OBJECTION HANDLER TAB -->
+  <div id="tab-objections" class="panel">
+    <div class="card full-width">
+      <div class="card-title"><span>🗣️</span> Objection Handler — Field Rebuttal Scripts</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+        <div>
+          <label style="display:block;font-size:11px;color:#94a3b8;margin-bottom:4px">OBJECTION TYPE</label>
+          <select id="obj-select" style="width:100%;padding:8px;background:#1e293b;border:1px solid #334155;border-radius:6px;color:#e2e8f0;font-size:13px">
+            <option value="">— Select an objection —</option>
+            <option value="too_expensive">1. "It's too expensive"</option>
+            <option value="not_interested">2. "Not interested"</option>
+            <option value="think_about_it">3. "Let me think about it"</option>
+            <option value="moving_soon">4. "We're moving soon"</option>
+            <option value="roof_concerns">5. "My roof is not right"</option>
+            <option value="hoa">6. "My HOA won't allow it"</option>
+            <option value="reliability">7. "Solar doesn't work"</option>
+            <option value="salesperson_distrust">8. "I don't trust solar companies"</option>
+            <option value="already_have_quote">9. "I already got a quote"</option>
+            <option value="spouse_partner">10. "Need to talk to my spouse"</option>
+          </select>
+        </div>
+        <div>
+          <label style="display:block;font-size:11px;color:#94a3b8;margin-bottom:4px">OR FREE-TEXT OBJECTION</label>
+          <input id="obj-freetext" type="text" placeholder="e.g. my wife thinks its risky..." style="width:100%;padding:8px;background:#1e293b;border:1px solid #334155;border-radius:6px;color:#e2e8f0;font-size:13px;box-sizing:border-box">
+        </div>
+        <div>
+          <label style="display:block;font-size:11px;color:#94a3b8;margin-bottom:4px">HOMEOWNER ADDRESS (optional — injects real solar data)</label>
+          <input id="obj-address" type="text" placeholder="1905 E Marquette Dr, Gilbert AZ 85234" style="width:100%;padding:8px;background:#1e293b;border:1px solid #334155;border-radius:6px;color:#e2e8f0;font-size:13px;box-sizing:border-box">
+        </div>
+        <div>
+          <label style="display:block;font-size:11px;color:#94a3b8;margin-bottom:4px">MONTHLY BILL ($)</label>
+          <input id="obj-bill" type="number" value="175" style="width:100%;padding:8px;background:#1e293b;border:1px solid #334155;border-radius:6px;color:#e2e8f0;font-size:13px;box-sizing:border-box">
+        </div>
+      </div>
+      <button onclick="loadObjHandler()" style="padding:10px 28px;background:linear-gradient(135deg,#f59e0b,#d97706);border:none;border-radius:8px;color:#0f172a;font-weight:700;cursor:pointer;font-size:14px">⚡ Get Rebuttal Script</button>
+      <span style="margin-left:12px;font-size:12px;color:#64748b">Personalizes with real solar data when address is provided</span>
+    </div>
+
+    <div id="obj-results" style="display:none">
+      <!-- Hook card -->
+      <div class="card full-width" style="border-left:4px solid #f59e0b">
+        <div class="card-title" id="obj-title" style="color:#fbbf24">Loading...</div>
+        <div style="margin-bottom:8px;font-size:11px;color:#64748b" id="obj-context-badge"></div>
+        <div style="background:#1e293b;border-radius:8px;padding:14px;margin-top:8px">
+          <div style="font-size:11px;color:#94a3b8;margin-bottom:6px;text-transform:uppercase;letter-spacing:1px">Opening Hook — Say This First</div>
+          <div id="obj-hook" style="color:#fde68a;font-style:italic;font-size:15px;line-height:1.6"></div>
+        </div>
+      </div>
+
+      <!-- Rebuttals -->
+      <div class="card full-width">
+        <div class="card-title"><span>💬</span> Talking Points</div>
+        <div id="obj-rebuttals" style="display:flex;flex-direction:column;gap:10px"></div>
+      </div>
+
+      <!-- Transition -->
+      <div class="card full-width" style="border-left:4px solid #22d3ee">
+        <div style="font-size:11px;color:#94a3b8;margin-bottom:8px;text-transform:uppercase;letter-spacing:1px">Closing Pivot — Ask This to Move Forward</div>
+        <div id="obj-transition" style="color:#67e8f9;font-size:14px;font-weight:600"></div>
+      </div>
+    </div>
+
+    <div class="card full-width">
+      <div class="card-title"><span>📋</span> All 10 Objections — Quick Reference</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;margin-top:8px" id="obj-quick-list">
+        <div style="padding:10px;background:#1e293b;border-radius:8px;cursor:pointer" onclick="quickObjSelect('too_expensive')">
+          <div style="font-weight:600;color:#fbbf24">1. "It's too expensive"</div>
+          <div style="font-size:11px;color:#64748b">Focus: ITC, financing, payback, equity</div>
+        </div>
+        <div style="padding:10px;background:#1e293b;border-radius:8px;cursor:pointer" onclick="quickObjSelect('not_interested')">
+          <div style="font-weight:600;color:#fbbf24">2. "Not interested"</div>
+          <div style="font-size:11px;color:#64748b">Focus: 60-second analysis, neighbor savings</div>
+        </div>
+        <div style="padding:10px;background:#1e293b;border-radius:8px;cursor:pointer" onclick="quickObjSelect('think_about_it')">
+          <div style="font-weight:600;color:#fbbf24">3. "Let me think about it"</div>
+          <div style="font-size:11px;color:#64748b">Focus: cost of waiting, rate escalation</div>
+        </div>
+        <div style="padding:10px;background:#1e293b;border-radius:8px;cursor:pointer" onclick="quickObjSelect('moving_soon')">
+          <div style="font-weight:600;color:#fbbf24">4. "We're moving soon"</div>
+          <div style="font-size:11px;color:#64748b">Focus: home value, faster sale, warranty transfer</div>
+        </div>
+        <div style="padding:10px;background:#1e293b;border-radius:8px;cursor:pointer" onclick="quickObjSelect('roof_concerns')">
+          <div style="font-weight:600;color:#fbbf24">5. "My roof isn't right"</div>
+          <div style="font-size:11px;color:#64748b">Focus: satellite data, shading analysis, racking</div>
+        </div>
+        <div style="padding:10px;background:#1e293b;border-radius:8px;cursor:pointer" onclick="quickObjSelect('hoa')">
+          <div style="font-weight:600;color:#fbbf24">6. "My HOA won't allow it"</div>
+          <div style="font-size:11px;color:#64748b">Focus: ARS §33-1816, we handle approval</div>
+        </div>
+        <div style="padding:10px;background:#1e293b;border-radius:8px;cursor:pointer" onclick="quickObjSelect('reliability')">
+          <div style="font-weight:600;color:#fbbf24">7. "Solar doesn't work"</div>
+          <div style="font-size:11px;color:#64748b">Focus: net metering, battery, 25yr warranty</div>
+        </div>
+        <div style="padding:10px;background:#1e293b;border-radius:8px;cursor:pointer" onclick="quickObjSelect('salesperson_distrust')">
+          <div style="font-weight:600;color:#fbbf24">8. "I don't trust solar companies"</div>
+          <div style="font-size:11px;color:#64748b">Focus: ROC license, production guarantee</div>
+        </div>
+        <div style="padding:10px;background:#1e293b;border-radius:8px;cursor:pointer" onclick="quickObjSelect('already_have_quote')">
+          <div style="font-weight:600;color:#fbbf24">9. "I already got a quote"</div>
+          <div style="font-size:11px;color:#64748b">Focus: $/watt, microinverters, guarantees</div>
+        </div>
+        <div style="padding:10px;background:#1e293b;border-radius:8px;cursor:pointer" onclick="quickObjSelect('spouse_partner')">
+          <div style="font-weight:600;color:#fbbf24">10. "Need to talk to my spouse"</div>
+          <div style="font-size:11px;color:#64748b">Focus: include them now, send summary</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card full-width">
+      <div class="card-title"><span>💡</span> Pro Tips for Field Reps</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:8px">
+        <div style="padding:12px;background:#1e293b;border-radius:8px">
+          <div style="font-weight:600;color:#22d3ee;margin-bottom:6px">🎯 Real Data = Real Trust</div>
+          <div style="font-size:12px;color:#94a3b8">Enter the homeowner's address before your appointment. The rebuttal script will inject their actual roof score, savings, and payback — not generic estimates. Homeowners respond better to "your roof scores 84/100" than "most homes in Phoenix..."</div>
+        </div>
+        <div style="padding:12px;background:#1e293b;border-radius:8px">
+          <div style="font-weight:600;color:#22d3ee;margin-bottom:6px">🔄 Stack Objections</div>
+          <div style="font-size:12px;color:#94a3b8">If a homeowner gives multiple objections, handle them in order: financial objections first (they're usually the real issue), then logistical ones. Use the Opening Hook as a pattern interrupt, then run 2-3 talking points, then the Closing Pivot to re-qualify.</div>
+        </div>
+        <div style="padding:12px;background:#1e293b;border-radius:8px">
+          <div style="font-weight:600;color:#22d3ee;margin-bottom:6px">📱 Mobile Access</div>
+          <div style="font-size:12px;color:#94a3b8">This tool works on mobile. Save this page to your home screen before your next canvass session. When you hit an objection in the field, pull up the handler, type what they said, and get the rebuttal in 3 seconds.</div>
+        </div>
+        <div style="padding:12px;background:#1e293b;border-radius:8px">
+          <div style="font-weight:600;color:#22d3ee;margin-bottom:6px">⚡ API Integration</div>
+          <div style="font-size:12px;color:#94a3b8">Developers: GET /api/objections/{key}?address=...&amp;monthly_bill=175 — or POST /api/objections/match with {"query": "free text objection"}. Embed rebuttal scripts in your GHL workflows or SMS follow-up sequences.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div id="tab-about" class="panel">
     <div class="grid-2">
       <div class="card">
@@ -1022,6 +1154,7 @@ function switchTab(name) {
   if (name === 'history') loadHistory();
   if (name === 'territory-report') loadCachedTerritoryList();
   if (name === 'lead-map') loadLeadMapStats();
+  if (name === 'objections') loadObjList();
   if (name === 'canvass') {
     // pre-fill with a Gilbert example if empty
     const ca = document.getElementById('canvass-address');
@@ -1373,6 +1506,10 @@ function renderLead(d) {
         <button onclick="openIncentivesForLead('${d.state||'AZ'}', ${d.gross_cost_usd||20000}, ${d.system_size_kw||6})"
                 style="flex:1;min-width:140px;padding:10px;background:#1e293b;border:1px solid #facc15;color:#facc15;border-radius:8px;cursor:pointer;font-size:0.85rem;font-weight:600;">
           🏛️ Incentives Stack
+        </button>
+        <button onclick="openObjHandlerForLead('${d.address}', ${d.monthly_bill_used||175})"
+                style="flex:1;min-width:140px;padding:10px;background:#1e293b;border:1px solid #f59e0b;color:#f59e0b;border-radius:8px;cursor:pointer;font-size:0.85rem;font-weight:600;">
+          🗣️ Objection Handler
         </button>
       </div>
       <div id="ghl-push-result" style="margin-top:10px;font-size:0.82rem;"></div>
@@ -2167,6 +2304,109 @@ function openIncentivesForLead(state, grossCost, kw) {
   if (grossCost) document.getElementById('inc-cost').value = grossCost;
   if (kw) document.getElementById('inc-kw').value = kw;
   setTimeout(loadIncentives, 100);
+}
+
+// ─── OBJECTION HANDLER FUNCTIONS ──────────────────────────────────────────────
+
+let objListLoaded = false;
+
+function loadObjList() {
+  if (objListLoaded) return;
+  objListLoaded = true;
+  // Nothing to load dynamically — static list is already in HTML
+}
+
+function quickObjSelect(id) {
+  document.getElementById('obj-select').value = id;
+  document.getElementById('obj-freetext').value = '';
+  loadObjHandler();
+}
+
+async function loadObjHandler() {
+  const selectVal = document.getElementById('obj-select').value;
+  const freetext  = document.getElementById('obj-freetext').value.trim();
+  const address   = document.getElementById('obj-address').value.trim();
+  const bill      = parseFloat(document.getElementById('obj-bill').value) || 175;
+
+  const query = freetext || selectVal;
+  if (!query) {
+    alert('Please select an objection type or type a free-text objection.');
+    return;
+  }
+
+  document.getElementById('obj-results').style.display = 'none';
+  document.getElementById('obj-title').textContent = '⏳ Loading rebuttal script...';
+
+  try {
+    let data, url;
+    if (freetext) {
+      // POST /api/objections/match
+      const body = { query: freetext, monthly_bill: bill };
+      if (address) body.address = address;
+      const resp = await fetch('/api/objections/match', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(body)
+      });
+      if (!resp.ok) throw new Error(`API error ${resp.status}`);
+      data = await resp.json();
+    } else {
+      // GET /api/objections/{key}
+      let params = `monthly_bill=${bill}`;
+      if (address) params += `&address=${encodeURIComponent(address)}`;
+      const resp = await fetch(`/api/objections/${query}?${params}`);
+      if (!resp.ok) throw new Error(`API error ${resp.status}: ${await resp.text()}`);
+      data = await resp.json();
+    }
+
+    // Render results
+    document.getElementById('obj-title').textContent = data.title || 'Objection';
+
+    // Context badge
+    const badge = document.getElementById('obj-context-badge');
+    if (data.context_used && data.address) {
+      badge.innerHTML = `✅ Personalized with real data — <strong>${data.address}</strong> | Score: <strong>${data.lead_score}/100</strong> | Grade: <strong>${data.grade}</strong>`;
+      badge.style.color = '#4ade80';
+    } else {
+      badge.innerHTML = `📊 Bill-only estimates ($${bill}/mo) — add address above for personalized data`;
+      badge.style.color = '#94a3b8';
+    }
+
+    // Hook
+    document.getElementById('obj-hook').textContent = data.hook || '';
+
+    // Rebuttals
+    const rDiv = document.getElementById('obj-rebuttals');
+    rDiv.innerHTML = '';
+    (data.rebuttals || []).forEach((rb, i) => {
+      const d = document.createElement('div');
+      d.style.cssText = 'padding:12px 14px;background:#1e293b;border-radius:8px;font-size:13px;line-height:1.6;color:#e2e8f0;border-left:3px solid #334155';
+      d.textContent = rb;
+      rDiv.appendChild(d);
+    });
+
+    // Transition
+    document.getElementById('obj-transition').textContent = '➜ ' + (data.transition || '');
+
+    // Show results
+    document.getElementById('obj-results').style.display = 'block';
+    document.getElementById('obj-results').scrollIntoView({behavior: 'smooth', block: 'start'});
+
+  } catch(e) {
+    document.getElementById('obj-title').textContent = '❌ Error: ' + e.message;
+    document.getElementById('obj-results').style.display = 'block';
+  }
+}
+
+function openObjHandlerForLead(address, bill) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  const tab = document.querySelector('[onclick*="objections"]');
+  if (tab) tab.classList.add('active');
+  const panel = document.getElementById('tab-objections');
+  if (panel) panel.classList.add('active');
+  if (address) document.getElementById('obj-address').value = address;
+  if (bill) document.getElementById('obj-bill').value = bill;
 }
 
 </script>

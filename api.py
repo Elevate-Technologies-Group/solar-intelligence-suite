@@ -7,7 +7,7 @@ import sys, os, json
 from concurrent.futures import ThreadPoolExecutor, as_completed
 sys.path.insert(0, "/root/solar-tools")
 
-from fastapi import FastAPI, HTTPException, Query, Body
+from fastapi import FastAPI, HTTPException, Query, Body, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -1796,6 +1796,74 @@ async def lead_incentives(
         "effective_discount_pct": incentives["effective_discount_pct"],
         "incentive_summary": incentives["summary_line"],
     })
+
+
+# ─── OBJECTION HANDLER ENDPOINTS ─────────────────────────────────────────────
+
+@app.get("/api/objections")
+def list_objections_api():
+    """List all 10 objection types with keywords."""
+    try:
+        from scripts.objection_handler import list_objections
+    except ImportError as e:
+        raise HTTPException(503, f"Objection handler not available: {e}")
+    return JSONResponse({"objections": list_objections(), "total": 10})
+
+
+@app.get("/api/objections/{objection_key}")
+def get_objection_rebuttals(
+    objection_key: str,
+    address: str = Query(None, description="Homeowner address for personalized data"),
+    monthly_bill: float = Query(175.0, description="Monthly electric bill"),
+    utility_rate: float = Query(0.14),
+):
+    """
+    Get personalized rebuttal script for a specific objection.
+    objection_key: number (1-10), id (e.g. 'too_expensive'), or keyword phrase.
+    """
+    try:
+        from scripts.objection_handler import get_rebuttals
+    except ImportError as e:
+        raise HTTPException(503, f"Objection handler not available: {e}")
+
+    lead = None
+    if address:
+        lead = enrich_lead(address, monthly_bill=monthly_bill, utility_rate=utility_rate)
+
+    result = get_rebuttals(objection_key, lead=lead, monthly_bill=monthly_bill)
+    if "error" in result:
+        raise HTTPException(404, result["error"])
+    return JSONResponse(result)
+
+
+@app.post("/api/objections/match")
+async def match_objection(request: Request):
+    """
+    Match an objection from free-form text and return rebuttal script.
+    Body: {query, address?, monthly_bill?, utility_rate?}
+    """
+    try:
+        from scripts.objection_handler import get_rebuttals
+    except ImportError as e:
+        raise HTTPException(503, f"Objection handler not available: {e}")
+
+    body = await request.json()
+    query = body.get("query", "")
+    if not query:
+        raise HTTPException(400, "query is required")
+
+    address = body.get("address")
+    monthly_bill = float(body.get("monthly_bill", 175.0))
+    utility_rate = float(body.get("utility_rate", 0.14))
+
+    lead = None
+    if address:
+        lead = enrich_lead(address, monthly_bill=monthly_bill, utility_rate=utility_rate)
+
+    result = get_rebuttals(query, lead=lead, monthly_bill=monthly_bill)
+    if "error" in result:
+        raise HTTPException(404, result["error"])
+    return JSONResponse(result)
 
 
 if __name__ == "__main__":
