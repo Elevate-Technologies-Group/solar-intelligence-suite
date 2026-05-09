@@ -159,6 +159,7 @@
     <div class="tab" onclick="switchTab('financing')">💳 Financing Calculator</div>
     <div class="tab" onclick="switchTab('incentives')">🏛️ Incentives Database</div>
     <div class="tab" onclick="switchTab('objections')">🗣️ Objection Handler</div>
+    <div class="tab" onclick="switchTab('door-script')">🚪 Door-Knock Script</div>
     <div class="tab" onclick="switchTab('about')">📖 How It Works</div>
   </div>
 
@@ -952,6 +953,117 @@
         <div style="padding:12px;background:#1e293b;border-radius:8px">
           <div style="font-weight:600;color:#22d3ee;margin-bottom:6px">⚡ API Integration</div>
           <div style="font-size:12px;color:#94a3b8">Developers: GET /api/objections/{key}?address=...&amp;monthly_bill=175 — or POST /api/objections/match with {"query": "free text objection"}. Embed rebuttal scripts in your GHL workflows or SMS follow-up sequences.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DOOR-KNOCK SCRIPT PANEL -->
+  <div id="tab-door-script" class="panel">
+    <div class="card full-width">
+      <div class="card-title"><span>🚪</span> Door-Knock Script Generator — Personalized Field Sales Scripts</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+        <div>
+          <label style="display:block;font-size:11px;color:#94a3b8;margin-bottom:4px">HOMEOWNER ADDRESS</label>
+          <input id="dk-address" type="text" placeholder="1905 E Marquette Dr, Gilbert AZ 85234" style="width:100%;padding:8px;background:#1e293b;border:1px solid #334155;border-radius:6px;color:#e2e8f0;font-size:13px;box-sizing:border-box">
+        </div>
+        <div>
+          <label style="display:block;font-size:11px;color:#94a3b8;margin-bottom:4px">MONTHLY ELECTRIC BILL ($)</label>
+          <input id="dk-bill" type="number" value="175" style="width:100%;padding:8px;background:#1e293b;border:1px solid #334155;border-radius:6px;color:#e2e8f0;font-size:13px;box-sizing:border-box">
+        </div>
+      </div>
+      <button onclick="loadDoorKnockScript()" style="padding:10px 28px;background:linear-gradient(135deg,#22d3ee,#0891b2);border:none;border-radius:8px;color:#0f172a;font-weight:700;cursor:pointer;font-size:14px">🚪 Generate Door-Knock Script</button>
+      <span style="margin-left:12px;font-size:12px;color:#64748b">Injects real satellite solar data into a proven 5-step field script</span>
+    </div>
+
+    <div id="dk-results" style="display:none">
+      <!-- Score badge + header -->
+      <div class="card full-width" id="dk-header-card" style="border-left:4px solid #22d3ee">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px">
+          <div>
+            <div style="font-size:16px;font-weight:700;color:#22d3ee" id="dk-address-display"></div>
+            <div style="font-size:12px;color:#64748b;margin-top:4px" id="dk-meta"></div>
+          </div>
+          <div id="dk-score-badge" style="background:#1e293b;border-radius:10px;padding:12px 20px;text-align:center;min-width:90px">
+            <div style="font-size:28px;font-weight:700" id="dk-score-val">—</div>
+            <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:1px">Lead Score</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 1 Opener -->
+      <div class="card full-width" style="border-left:4px solid #10b981">
+        <div style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">STEP 1 — OPENER (say within first 5 seconds)</div>
+        <div id="dk-opener" style="color:#d1fae5;font-size:14px;line-height:1.7;font-style:italic"></div>
+      </div>
+
+      <!-- Step 2 Discovery -->
+      <div class="card full-width" style="border-left:4px solid #f59e0b">
+        <div style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">STEP 2 — DISCOVERY QUESTION</div>
+        <div id="dk-discovery" style="color:#fde68a;font-size:14px;line-height:1.7;font-weight:600"></div>
+        <div id="dk-discovery-followup" style="color:#94a3b8;font-size:13px;line-height:1.6;margin-top:8px"></div>
+        <div id="dk-rep-note" style="margin-top:10px;padding:8px 12px;background:#292524;border-radius:6px;font-size:12px;color:#fbbf24"></div>
+      </div>
+
+      <!-- Step 3 Pivot -->
+      <div class="card full-width" style="border-left:4px solid #8b5cf6">
+        <div style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">STEP 3 — THE PIVOT (transition to solar)</div>
+        <div id="dk-pivot" style="color:#e9d5ff;font-size:14px;line-height:1.7"></div>
+      </div>
+
+      <!-- Step 4 Proof Points -->
+      <div class="card full-width">
+        <div class="card-title"><span>📊</span> STEP 4 — PROOF POINTS (pick 3–4 that resonate)</div>
+        <div id="dk-proof-points" style="display:flex;flex-direction:column;gap:8px;margin-top:8px"></div>
+      </div>
+
+      <!-- Step 5 Close options -->
+      <div class="card full-width" style="border-left:4px solid #ec4899">
+        <div class="card-title"><span>🤝</span> STEP 5 — CLOSE OPTIONS</div>
+        <div id="dk-close-options" style="display:flex;flex-direction:column;gap:14px;margin-top:8px"></div>
+      </div>
+
+      <!-- Objection Handling -->
+      <div class="card full-width">
+        <div class="card-title"><span>🛡️</span> OBJECTION HANDLING (keep in your back pocket)</div>
+        <div id="dk-objections" style="display:flex;flex-direction:column;gap:12px;margin-top:8px"></div>
+      </div>
+
+      <!-- Field Notes -->
+      <div class="card full-width" id="dk-field-notes-card" style="display:none">
+        <div class="card-title"><span>📋</span> FIELD NOTES (rep reference only)</div>
+        <div id="dk-field-notes" style="font-size:13px;color:#94a3b8;line-height:2;margin-top:4px"></div>
+      </div>
+
+      <!-- Quick Actions -->
+      <div class="card full-width">
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+          <button onclick="dkCopyScript()" style="padding:8px 18px;background:#1e293b;border:1px solid #334155;border-radius:6px;color:#e2e8f0;cursor:pointer;font-size:13px">📋 Copy Script</button>
+          <button onclick="dkDownloadScript()" style="padding:8px 18px;background:#1e293b;border:1px solid #334155;border-radius:6px;color:#e2e8f0;cursor:pointer;font-size:13px">⬇️ Download TXT</button>
+          <span style="font-size:11px;color:#475569">Generated from real satellite rooftop data — refreshes every 24h</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Info cards -->
+    <div class="grid-2" style="margin-top:16px">
+      <div class="card">
+        <div class="card-title"><span>🚀</span> How to Use This Tool</div>
+        <div style="font-size:13px;color:#94a3b8;line-height:2">
+          <p>1. Enter the homeowner's address before you knock</p>
+          <p>2. Read the <strong style="color:#22d3ee">Opener</strong> within the first 5 seconds</p>
+          <p>3. Ask the <strong style="color:#fbbf24">Discovery Question</strong> — listen carefully</p>
+          <p>4. Use the <strong style="color:#8b5cf6">Pivot</strong> to bridge to solar</p>
+          <p>5. Pick 3–4 <strong style="color:#10b981">Proof Points</strong> that match their concerns</p>
+          <p>6. Close with the <strong style="color:#ec4899">Soft Close</strong> — ask for an appointment</p>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title"><span>⚡</span> API Access</div>
+        <div style="font-size:12px;color:#94a3b8;line-height:2">
+          <p><span style="color:var(--green)">GET</span> <span style="color:var(--accent)">/api/lead/door-script?address=...&monthly_bill=175</span></p>
+          <p><span style="color:var(--green)">POST</span> <span style="color:var(--accent)">/api/lead/door-script</span> — body: {address, monthly_bill}</p>
+          <p style="margin-top:8px">Returns full JSON script with all 5 steps, close options, and objection handling — ready for mobile app or GHL integration.</p>
         </div>
       </div>
     </div>
@@ -2407,6 +2519,177 @@ function openObjHandlerForLead(address, bill) {
   if (panel) panel.classList.add('active');
   if (address) document.getElementById('obj-address').value = address;
   if (bill) document.getElementById('obj-bill').value = bill;
+}
+// ── Door-Knock Script ─────────────────────────────────────────────────────────
+
+let _dkLastResult = null;
+
+async function loadDoorKnockScript() {
+  const address = document.getElementById('dk-address').value.trim();
+  const bill    = parseFloat(document.getElementById('dk-bill').value) || 175;
+  if (!address) { alert('Please enter a homeowner address.'); return; }
+
+  const btn = document.querySelector('[onclick="loadDoorKnockScript()"]');
+  const orig = btn.textContent;
+  btn.textContent = '⟳ Loading…';
+  btn.disabled = true;
+
+  try {
+    const url = `/api/lead/door-script?address=${encodeURIComponent(address)}&monthly_bill=${bill}`;
+    const r = await fetch(url);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const d = await r.json();
+    _dkLastResult = d;
+    renderDoorKnockScript(d);
+  } catch(e) {
+    alert('Error generating script: ' + e.message);
+  } finally {
+    btn.textContent = orig;
+    btn.disabled = false;
+  }
+}
+
+function renderDoorKnockScript(d) {
+  const s = d.script || {};
+  document.getElementById('dk-results').style.display = '';
+
+  // Header
+  document.getElementById('dk-address-display').textContent = d.address || 'Address';
+  const scoreColor = d.lead_score >= 80 ? '#10b981' : d.lead_score >= 60 ? '#f59e0b' : '#ef4444';
+  document.getElementById('dk-score-val').style.color = scoreColor;
+  document.getElementById('dk-score-val').textContent = d.has_real_data ? `${d.lead_score}/100 ${d.lead_grade}` : 'N/A';
+  document.getElementById('dk-meta').textContent =
+    `$${d.monthly_bill}/mo bill · Priority: ${d.priority || '—'} · ${d.has_real_data ? '✅ Real satellite data' : 'ℹ️ Generic script'}`;
+
+  // Steps 1–3
+  document.getElementById('dk-opener').textContent = s.step1_opener || '';
+  document.getElementById('dk-discovery').textContent = s.step2_discovery || '';
+  document.getElementById('dk-discovery-followup').textContent = s.step2_followup || '';
+  document.getElementById('dk-rep-note').textContent = '💡 REP NOTE: ' + (s.step2_rep_note || '');
+  document.getElementById('dk-pivot').textContent = s.step3_pivot || '';
+
+  // Step 4 Proof points
+  const ppEl = document.getElementById('dk-proof-points');
+  ppEl.innerHTML = '';
+  (s.step4_proof_points || []).forEach((pt, i) => {
+    ppEl.innerHTML += `<div style="background:#1e293b;border-radius:8px;padding:12px;font-size:13px;color:#e2e8f0;line-height:1.6">
+      <span style="color:#64748b;font-weight:700;margin-right:6px">${i+1}.</span>${pt}
+    </div>`;
+  });
+
+  // Step 5 Close options
+  const closeEl = document.getElementById('dk-close-options');
+  closeEl.innerHTML = '';
+  (s.step5_close_options || []).forEach(opt => {
+    closeEl.innerHTML += `<div style="background:#1e293b;border-radius:8px;padding:14px">
+      <div style="font-size:11px;font-weight:700;color:#ec4899;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">▶ ${opt.label}</div>
+      <div style="font-size:13px;color:#e2e8f0;line-height:1.7;font-style:italic">"${opt.script}"</div>
+    </div>`;
+  });
+
+  // Objection handling
+  const objEl = document.getElementById('dk-objections');
+  objEl.innerHTML = '';
+  (s.objection_handling || []).forEach(obj => {
+    objEl.innerHTML += `<div style="background:#1e293b;border-radius:8px;padding:14px">
+      <div style="font-weight:700;color:#fbbf24;margin-bottom:8px;font-size:13px">${obj.objection}</div>
+      <div style="font-size:13px;color:#e2e8f0;line-height:1.7">${obj.rebuttal}</div>
+    </div>`;
+  });
+
+  // Field notes
+  const notes = s.field_notes || [];
+  const notesCard = document.getElementById('dk-field-notes-card');
+  if (notes.length > 0) {
+    notesCard.style.display = '';
+    document.getElementById('dk-field-notes').innerHTML =
+      notes.map(n => `<div>• ${n}</div>`).join('');
+  } else {
+    notesCard.style.display = 'none';
+  }
+
+  document.getElementById('dk-results').scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+function dkCopyScript() {
+  if (!_dkLastResult) return;
+  const d = _dkLastResult;
+  const s = d.script || {};
+  const lines = [
+    `DOOR-KNOCK SCRIPT — ${d.address}`,
+    `Monthly Bill: $${d.monthly_bill} | Score: ${d.lead_score}/${d.lead_grade} | ${d.priority}`,
+    '',
+    '═══ STEP 1: OPENER ═══',
+    s.step1_opener || '',
+    '',
+    '═══ STEP 2: DISCOVERY ═══',
+    s.step2_discovery || '',
+    s.step2_followup || '',
+    `[Note: ${s.step2_rep_note || ''}]`,
+    '',
+    '═══ STEP 3: PIVOT ═══',
+    s.step3_pivot || '',
+    '',
+    '═══ STEP 4: PROOF POINTS ═══',
+    ...(s.step4_proof_points || []).map((p,i)=>`${i+1}. ${p}`),
+    '',
+    '═══ STEP 5: CLOSE ═══',
+    ...(s.step5_close_options || []).map(o=>`[${o.label}]: "${o.script}"`),
+    '',
+    '═══ OBJECTION HANDLING ═══',
+    ...(s.objection_handling || []).map(o=>`${o.objection}\n→ ${o.rebuttal}`),
+  ];
+  navigator.clipboard.writeText(lines.join('\n')).then(()=>alert('✅ Script copied to clipboard!'));
+}
+
+function dkDownloadScript() {
+  if (!_dkLastResult) return;
+  const d = _dkLastResult;
+  const s = d.script || {};
+  const lines = [
+    `DOOR-KNOCK SCRIPT`,
+    `Address: ${d.address}`,
+    `Monthly Bill: $${d.monthly_bill} | Score: ${d.lead_score}/100 ${d.lead_grade} | ${d.priority}`,
+    `Generated: ${new Date().toLocaleString()}`,
+    '',
+    '=' .repeat(60),
+    'STEP 1 — OPENER (say within first 5 seconds)',
+    '='.repeat(60),
+    s.step1_opener || '',
+    '',
+    '='.repeat(60),
+    'STEP 2 — DISCOVERY QUESTION',
+    '='.repeat(60),
+    s.step2_discovery || '',
+    '',
+    s.step2_followup || '',
+    `[REP NOTE: ${s.step2_rep_note||''}]`,
+    '',
+    '='.repeat(60),
+    'STEP 3 — THE PIVOT',
+    '='.repeat(60),
+    s.step3_pivot || '',
+    '',
+    '='.repeat(60),
+    'STEP 4 — PROOF POINTS',
+    '='.repeat(60),
+    ...(s.step4_proof_points||[]).map((p,i)=>`${i+1}. ${p}`),
+    '',
+    '='.repeat(60),
+    'STEP 5 — CLOSE OPTIONS',
+    '='.repeat(60),
+    ...(s.step5_close_options||[]).flatMap(o=>[`▶ ${o.label}`, `"${o.script}"`, '']),
+    '='.repeat(60),
+    'OBJECTION HANDLING',
+    '='.repeat(60),
+    ...(s.objection_handling||[]).flatMap(o=>[`❓ ${o.objection}`, `→ ${o.rebuttal}`, '']),
+    ...(s.field_notes||[]).length>0 ? ['='.repeat(60), 'FIELD NOTES', '='.repeat(60), ...(s.field_notes||[])] : [],
+  ];
+  const blob = new Blob([lines.join('\n')], {type:'text/plain'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `door_knock_script_${(d.address||'').replace(/[^a-z0-9]/gi,'_').toLowerCase()}.txt`;
+  a.click();
 }
 
 </script>

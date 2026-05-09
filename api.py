@@ -1866,5 +1866,51 @@ async def match_objection(request: Request):
     return JSONResponse(result)
 
 
+# ─── DOOR-KNOCK SCRIPT ENDPOINTS ─────────────────────────────────────────────
+
+@app.get("/api/lead/door-script")
+async def door_knock_script_get(
+    address: str = Query(..., description="Homeowner address"),
+    monthly_bill: float = Query(175.0, description="Monthly electric bill USD"),
+    utility_rate: float = Query(0.14),
+):
+    """
+    Generate a personalized door-knock sales script for the given address.
+    Returns a full 5-step script: Opener, Discovery, Pivot, Proof Points, Close.
+    """
+    try:
+        from scripts.door_knock_script import generate_door_knock_script
+    except ImportError as e:
+        raise HTTPException(503, f"Door knock script module not available: {e}")
+
+    lead = enrich_lead(address, monthly_bill=monthly_bill, utility_rate=utility_rate)
+    result = generate_door_knock_script(lead, monthly_bill=monthly_bill)
+    return JSONResponse(result)
+
+
+@app.post("/api/lead/door-script")
+async def door_knock_script_post(request: Request):
+    """
+    POST body: {"address": "...", "monthly_bill": 175, "utility_rate": 0.14}
+    Returns personalized door-knock script JSON.
+    """
+    try:
+        from scripts.door_knock_script import generate_door_knock_script
+    except ImportError as e:
+        raise HTTPException(503, f"Door knock script module not available: {e}")
+
+    body = await request.json()
+    address = body.get("address")
+    monthly_bill = float(body.get("monthly_bill", 175.0))
+    utility_rate = float(body.get("utility_rate", 0.14))
+
+    lead = None
+    if address:
+        lead = enrich_lead(address, monthly_bill=monthly_bill, utility_rate=utility_rate)
+
+    result = generate_door_knock_script(lead, monthly_bill=monthly_bill)
+    return JSONResponse(result)
+
+
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8765)
