@@ -1288,5 +1288,384 @@ window.addEventListener('DOMContentLoaded', () => {
     return "".join(parts)
 
 
+# ── Financing Calculator ──────────────────────────────────────────────────────
+
+@app.post("/api/lead/financing",
+    summary="Solar financing calculator — $0-down monthly payment vs current bill",
+    tags=["Lead Intelligence"])
+async def lead_financing_post(body: dict = Body(...)):
+    """
+    Calculate solar financing options for an address or bill-only estimate.
+
+    Body:
+        address (str, optional): Street address to enrich with real solar data.
+        monthly_bill (float): Monthly electric bill in dollars. Default: 175.
+        utility_rate (float): $/kWh. Default: 0.145.
+        state_credit_pct (float): Additional state tax credit %. Default: 0.0.
+        enrich (bool): Whether to call Google Solar API. Default: True.
+
+    Returns:
+        Full financing breakdown: loan options, day-1 cash flow, escalation table,
+        talking points, and lead data if enriched.
+    """
+    try:
+        from scripts.financing_calculator import calculate_financing
+    except ImportError as e:
+        raise HTTPException(503, f"Financing module not available: {e}")
+
+    address     = body.get("address", "")
+    monthly_bill = float(body.get("monthly_bill", 175))
+    utility_rate = float(body.get("utility_rate", 0.145))
+    state_credit = float(body.get("state_credit_pct", 0.0))
+    do_enrich    = body.get("enrich", True)
+
+    lead = None
+    if address and do_enrich:
+        try:
+            lead = enrich_lead(address)
+        except Exception as e:
+            lead = {"error": str(e)}
+
+    result = calculate_financing(
+        lead,
+        monthly_bill     = monthly_bill,
+        utility_rate     = utility_rate,
+        include_state_incentive = state_credit,
+    )
+    return JSONResponse(result)
+
+
+@app.get("/api/lead/financing",
+    summary="Solar financing calculator (GET, bill-only or with address)",
+    tags=["Lead Intelligence"])
+async def lead_financing_get(
+    monthly_bill: float         = Query(175.0, description="Monthly electric bill ($)"),
+    address:      Optional[str] = Query(None,  description="Address for real solar data"),
+    utility_rate: float         = Query(0.145, description="$/kWh"),
+    state_credit: float         = Query(0.0,   description="State credit % (0.0–1.0)"),
+    enrich:       bool          = Query(True,  description="Use Google Solar API"),
+):
+    """GET version of financing calculator — quick bill estimate or full enrichment."""
+    try:
+        from scripts.financing_calculator import calculate_financing
+    except ImportError as e:
+        raise HTTPException(503, f"Financing module not available: {e}")
+
+    lead = None
+    if address and enrich:
+        try:
+            lead = enrich_lead(address)
+        except Exception as e:
+            lead = {"error": str(e)}
+
+    result = calculate_financing(
+        lead,
+        monthly_bill     = monthly_bill,
+        utility_rate     = utility_rate,
+        include_state_incentive = state_credit,
+    )
+    return JSONResponse(result)
+
+
+@app.get("/api/lead/financing/widget",
+    response_class=HTMLResponse,
+    summary="Embeddable financing widget (HTML) — shareable with homeowners",
+    tags=["Lead Intelligence"])
+async def financing_widget(
+    bill:          float = Query(175.0, description="Monthly electric bill"),
+    address:       Optional[str] = Query(None, description="Pre-fill address"),
+    primary_color: str  = Query("22c55e", description="Brand color hex (no #)"),
+    company:       str  = Query("Elevate Solar", description="Company name"),
+    phone:         str  = Query("", description="Company phone"),
+):
+    """
+    Returns a standalone embeddable HTML widget for the financing calculator.
+    Embed on any website:
+        <iframe src='/api/lead/financing/widget?bill=175&company=Elevate+Solar' ...>
+    """
+    from scripts.financing_calculator import calculate_financing
+    # Bill-only base for widget default state
+    base = calculate_financing(None, monthly_bill=bill)
+    rec  = base["recommended_option"]
+    col  = f"#{primary_color}"
+
+    widget = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Solar Financing — {company}</title>
+<style>
+*{{box-sizing:border-box;margin:0;padding:0}}
+body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  background:#0f172a;color:#e2e8f0;padding:16px;min-height:100vh}}
+.header{{text-align:center;padding:18px 0 14px;border-bottom:1px solid #1e293b;margin-bottom:18px}}
+.header h1{{font-size:1.3rem;color:{col};font-weight:800}}
+.header p{{font-size:0.8rem;color:#94a3b8;margin-top:4px}}
+.input-row{{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}}
+.input-group{{flex:1;min-width:130px}}
+.input-group label{{display:block;font-size:0.72rem;color:#94a3b8;margin-bottom:4px}}
+.input-group input{{width:100%;background:#1e293b;border:1px solid #334155;
+  color:#e2e8f0;padding:8px 10px;border-radius:8px;font-size:0.85rem}}
+.btn{{width:100%;padding:11px;background:{col};color:#0f172a;border:none;
+  border-radius:8px;font-weight:800;cursor:pointer;font-size:0.9rem;margin-bottom:14px}}
+.btn:hover{{opacity:0.9}}
+.summary{{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}}
+.stat-box{{background:#1e293b;border-radius:10px;padding:12px;text-align:center}}
+.stat-val{{font-size:1.4rem;font-weight:800;color:{col}}}
+.stat-lbl{{font-size:0.68rem;color:#94a3b8;margin-top:3px}}
+.table-wrap{{overflow-x:auto;margin-bottom:14px}}
+table{{width:100%;border-collapse:collapse;font-size:0.78rem}}
+th{{background:#1e293b;padding:8px 10px;text-align:left;color:#94a3b8;
+   border-bottom:1px solid #334155}}
+td{{padding:8px 10px;border-bottom:1px solid #1e293b}}
+tr.best td{{background:#052e16;color:{col}}}
+tr.best td:first-child::before{{content:"★ ";color:{col}}}
+.cf-pos{{color:#22c55e;font-weight:700}}
+.cf-neg{{color:#f97316}}
+.cta{{background:#1e293b;border:2px solid {col};border-radius:10px;padding:14px;
+     text-align:center;margin-top:14px}}
+.cta .cta-head{{font-weight:800;color:{col};font-size:0.9rem;margin-bottom:6px}}
+.cta .cta-phone{{font-size:1.1rem;font-weight:800;color:#e2e8f0}}
+.cta .cta-sub{{font-size:0.72rem;color:#94a3b8;margin-top:4px}}
+.mode-badge{{text-align:center;font-size:0.7rem;color:#475569;margin-top:10px}}
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>⚡ Solar Financing Calculator</h1>
+  <p>See your $0-down monthly payment vs your current bill</p>
+</div>
+
+<div class="input-row">
+  <div class="input-group">
+    <label>Monthly Bill ($)</label>
+    <input id="w-bill" type="number" value="{bill}" min="50" max="2000" oninput="recalc()">
+  </div>
+  <div class="input-group" style="flex:2;min-width:180px;">
+    <label>Address (for real solar data)</label>
+    <input id="w-addr" type="text" placeholder="123 Main St, Phoenix AZ"
+           value="{address or ''}" style="font-size:0.78rem;">
+  </div>
+</div>
+<button class="btn" onclick="fetchCalc()">⚡ Calculate My Solar Payment</button>
+
+<div id="w-summary" class="summary">
+  <div class="stat-box">
+    <div class="stat-val" id="w-pmt">${rec["monthly_payment_usd"]:.0f}/mo</div>
+    <div class="stat-lbl">Loan Payment (25yr)</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-val cf-pos" id="w-cf">+${rec["day1_cashflow_usd"]:.0f}/mo</div>
+    <div class="stat-lbl">Day-1 Savings vs Bill</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-val" id="w-net">${base["net_cost_usd"]:,.0f}</div>
+    <div class="stat-lbl">Net Cost After ITC</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-val cf-pos" id="w-yr1">${base["annual_savings_usd"]:,.0f}/yr</div>
+    <div class="stat-lbl">Annual Savings</div>
+  </div>
+</div>
+
+<div class="table-wrap">
+<table id="w-table">
+<thead><tr>
+  <th>Loan Term</th><th>APR</th><th>Monthly Payment</th>
+  <th>vs Your Bill</th><th>Day-1 Cash Flow</th>
+</tr></thead>
+<tbody id="w-tbody">
+  {chr(10).join(
+    f"<tr class='{'best' if opt['years'] == rec['years'] else ''}'>"
+    f"<td>{opt['label']}</td>"
+    f"<td>{opt['apr_pct']}%</td>"
+    f"<td>${opt['monthly_payment_usd']:.0f}/mo</td>"
+    f"<td>{'saves' if opt['day1_cashflow_usd'] >= 0 else 'costs'} ${abs(opt['day1_cashflow_usd']):.0f}/mo</td>"
+    f"<td class='{'cf-pos' if opt['day1_cashflow_usd'] >= 0 else 'cf-neg'}'>"
+    f"{'+'if opt['day1_cashflow_usd']>=0 else ''}{opt['day1_cashflow_usd']:.0f}/mo</td>"
+    f"</tr>"
+    for opt in base["loan_options"]
+  )}
+</tbody>
+</table>
+</div>
+
+<div id="w-mode" class="mode-badge">📊 Estimate based on ${bill:.0f}/mo bill — enter address for real data</div>
+
+<div class="cta">
+  <div class="cta-head">Ready to own your power for less than your bill?</div>
+  {"<div class='cta-phone'>📞 " + phone + "</div>" if phone else ""}
+  <div class="cta-sub">{company} — Licensed Solar Specialist</div>
+</div>
+
+<script>
+const BASE = window.location.origin;
+async function fetchCalc() {{
+  const bill = parseFloat(document.getElementById('w-bill').value) || 175;
+  const addr = document.getElementById('w-addr').value.trim();
+  const params = new URLSearchParams({{monthly_bill: bill}});
+  if (addr) params.set('address', addr);
+  const res = await fetch(`${{BASE}}/api/lead/financing?${{params}}`);
+  if (!res.ok) return;
+  const d = await res.json();
+  renderWidget(d);
+}}
+function recalc() {{
+  const bill = parseFloat(document.getElementById('w-bill').value) || 175;
+  // Quick client-side estimate for the best 25yr option
+  const kw = (bill / 0.145 * 12 * 0.92) / 1450;
+  const net = kw * 1000 * 3.20 * 0.70;
+  const pmt = (net * (7.49/100/12) * Math.pow(1+7.49/100/12,300)) / (Math.pow(1+7.49/100/12,300)-1);
+  const sav = bill * 0.90;
+  const cf  = sav - pmt;
+  document.getElementById('w-pmt').textContent = `$${{pmt.toFixed(0)}}/mo`;
+  document.getElementById('w-cf').textContent  = `${{cf>=0?'+':''}}$${{Math.abs(cf).toFixed(0)}}/mo`;
+  document.getElementById('w-cf').className    = cf >= 0 ? 'stat-val cf-pos' : 'stat-val cf-neg';
+  document.getElementById('w-net').textContent = `$${{net.toLocaleString('en-US',{{maximumFractionDigits:0}})}}`;
+  document.getElementById('w-yr1').textContent = `$${{(sav*12).toLocaleString('en-US',{{maximumFractionDigits:0}})}}/yr`;
+}}
+function renderWidget(d) {{
+  const rec = d.recommended_option;
+  document.getElementById('w-pmt').textContent = `$${{rec.monthly_payment_usd.toFixed(0)}}/mo`;
+  const cf = rec.day1_cashflow_usd;
+  document.getElementById('w-cf').textContent  = `${{cf>=0?'+':''}}$${{Math.abs(cf).toFixed(0)}}/mo`;
+  document.getElementById('w-cf').className    = cf >= 0 ? 'stat-val cf-pos' : 'stat-val cf-neg';
+  document.getElementById('w-net').textContent = `$${{d.net_cost_usd.toLocaleString('en-US',{{maximumFractionDigits:0}})}}`;
+  document.getElementById('w-yr1').textContent = `$${{d.annual_savings_usd.toLocaleString('en-US',{{maximumFractionDigits:0}})}}/yr`;
+  const tbody = document.getElementById('w-tbody');
+  tbody.innerHTML = d.loan_options.map(o => {{
+    const cf2 = o.day1_cashflow_usd;
+    return `<tr class="${{o.years===rec.years?'best':''}}">
+      <td>${{o.label}}</td><td>${{o.apr_pct}}%</td>
+      <td>$${{o.monthly_payment_usd.toFixed(0)}}/mo</td>
+      <td>${{cf2>=0?'saves':'costs'}} $${{Math.abs(cf2).toFixed(0)}}/mo</td>
+      <td class="${{cf2>=0?'cf-pos':'cf-neg'}}">${{cf2>=0?'+':''}}$${{cf2.toFixed(0)}}/mo</td>
+    </tr>`;
+  }}).join('');
+  const mode = d.mode === 'enriched' ? `✅ Real solar data for ${{d.address}}` : `📊 Estimate based on $${{d.monthly_bill_usd}}/mo bill`;
+  document.getElementById('w-mode').textContent = mode;
+}}
+</script>
+</body>
+</html>"""
+    return HTMLResponse(content=widget)
+
+
+
+# ── GHL Contact Push ──────────────────────────────────────────────────────────
+
+@app.post("/api/lead/ghl-push",
+    summary="Push enriched lead to GoHighLevel CRM as a contact",
+    tags=["Integrations"])
+async def lead_ghl_push(body: dict = Body(...)):
+    """
+    Enrich a solar lead and push it to GoHighLevel CRM.
+
+    Body:
+        address (str): Street address to enrich. Required.
+        monthly_bill (float): Monthly electric bill. Default: 175.
+        first_name (str): Contact first name. Default: "Solar".
+        last_name (str): Contact last name. Default: "Lead".
+        email (str): Contact email. Optional.
+        phone (str): Contact phone. Optional.
+        add_note (bool): Add full analysis as CRM note. Default: True.
+        dry_run (bool): Build payload without sending. Default: False.
+
+    Requires env: GHL_API_KEY + GHL_LOCATION_ID
+    Returns: {pushed, contact_id, url, tags, ...} or {skipped, reason}
+    """
+    try:
+        from integrations.ghl_push import push_lead_to_ghl
+    except ImportError as e:
+        raise HTTPException(503, f"GHL integration not available: {e}")
+
+    address      = body.get("address", "")
+    monthly_bill = float(body.get("monthly_bill", 175))
+    first_name   = body.get("first_name", "Solar")
+    last_name    = body.get("last_name", "Lead")
+    email        = body.get("email", "")
+    phone        = body.get("phone", "")
+    add_note     = body.get("add_note", True)
+    dry_run      = body.get("dry_run", False)
+
+    if not address:
+        raise HTTPException(400, "address is required")
+
+    # Enrich
+    lead = None
+    try:
+        lead = enrich_lead(address)
+    except Exception as e:
+        lead = {"error": str(e)}
+
+    # Push
+    result = push_lead_to_ghl(
+        lead or {},
+        address,
+        first_name=first_name,
+        last_name=last_name,
+        email=email,
+        phone=phone,
+        add_note=add_note,
+        dry_run=dry_run,
+    )
+
+    # Attach lead summary to response
+    result["lead_score"]          = lead.get("lead_score") if lead else None
+    result["grade"]               = lead.get("grade") if lead else None
+    result["priority"]            = lead.get("priority") if lead else None
+    result["annual_savings_yr1"]  = lead.get("annual_savings_yr1_usd") if lead else None
+    result["address"]             = address
+
+    return JSONResponse(result)
+
+
+@app.get("/api/lead/ghl-push",
+    summary="GHL push status / connection test",
+    tags=["Integrations"])
+async def lead_ghl_push_get(
+    test: bool          = Query(False, description="Test GHL API connectivity"),
+    address: Optional[str] = Query(None, description="Address to push (with enrichment)"),
+    monthly_bill: float = Query(175.0, description="Monthly electric bill"),
+    dry_run: bool       = Query(False, description="Build payload without sending"),
+):
+    """
+    GET version: test connection or push a single address.
+    - /api/lead/ghl-push?test=true  → connectivity test
+    - /api/lead/ghl-push?address=...&dry_run=true  → dry-run push
+    """
+    try:
+        from integrations.ghl_push import push_lead_to_ghl, test_connection
+    except ImportError as e:
+        raise HTTPException(503, f"GHL integration not available: {e}")
+
+    if test:
+        result = test_connection()
+        return JSONResponse(result)
+
+    if not address:
+        return JSONResponse({
+            "info":     "GHL Contact Push — Solar Intelligence Suite",
+            "env_set":  {
+                "GHL_API_KEY":     bool(os.environ.get("GHL_API_KEY")),
+                "GHL_LOCATION_ID": bool(os.environ.get("GHL_LOCATION_ID")),
+            },
+            "usage":    "POST /api/lead/ghl-push with {address, monthly_bill, first_name, last_name}",
+            "test_url": "/api/lead/ghl-push?test=true",
+        })
+
+    lead = None
+    try:
+        lead = enrich_lead(address)
+    except Exception as e:
+        lead = {"error": str(e)}
+
+    result = push_lead_to_ghl(lead or {}, address, dry_run=dry_run)
+    result["lead_score"] = lead.get("lead_score") if lead else None
+    result["grade"]      = lead.get("grade") if lead else None
+    result["address"]    = address
+    return JSONResponse(result)
+
+
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8765)

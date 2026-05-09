@@ -156,6 +156,7 @@
     <div class="tab" onclick="switchTab('territory-report')">📊 Territory Reports</div>
     <div class="tab" onclick="switchTab('lead-map')">🗺️ Lead Map</div>
     <div class="tab" onclick="switchTab('waiting-cost')">⏳ Cost of Waiting</div>
+    <div class="tab" onclick="switchTab('financing')">💳 Financing Calculator</div>
     <div class="tab" onclick="switchTab('about')">📖 How It Works</div>
   </div>
 
@@ -665,6 +666,99 @@
             <div style="font-size:0.78rem;color:#94a3b8;">Add to any webpage:</div>
             <code style="font-size:0.72rem;color:#22c55e;display:block;margin-top:4px;word-break:break-all;">&lt;iframe src="http://localhost:8765/api/lead/waiting-cost/widget?bill=175&company=Elevate+Solar" width="700" height="800" frameborder="0"&gt;&lt;/iframe&gt;</code>
           </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="tab-financing" class="panel">
+    <div class="grid-2">
+      <div>
+        <!-- Input Card -->
+        <div class="card" style="margin-bottom:16px;">
+          <div class="card-title"><span>💳</span> Solar Financing Calculator</div>
+          <div style="font-size:0.82rem;color:var(--muted);margin-bottom:14px;">
+            Show homeowners their <strong style="color:#22c55e;">$0-down monthly payment</strong> vs their current bill — the #1 objection closer.
+          </div>
+          <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
+            <div style="flex:1;min-width:110px;">
+              <label style="display:block;font-size:0.75rem;color:var(--muted);margin-bottom:4px;">Monthly Bill ($)</label>
+              <input id="fc-bill" type="number" value="175" min="50" max="2000"
+                     style="width:100%;background:#0f172a;border:1px solid #334155;color:#e2e8f0;padding:8px 10px;border-radius:8px;font-size:0.9rem;">
+            </div>
+            <div style="flex:2;min-width:200px;">
+              <label style="display:block;font-size:0.75rem;color:var(--muted);margin-bottom:4px;">Address (optional — for real solar data)</label>
+              <input id="fc-address" type="text" placeholder="1905 E Marquette Dr, Gilbert AZ"
+                     style="width:100%;background:#0f172a;border:1px solid #334155;color:#e2e8f0;padding:8px 10px;border-radius:8px;font-size:0.9rem;">
+            </div>
+            <div style="flex:1;min-width:100px;">
+              <label style="display:block;font-size:0.75rem;color:var(--muted);margin-bottom:4px;">State Credit %</label>
+              <input id="fc-state" type="number" value="0" min="0" max="50" step="1"
+                     style="width:100%;background:#0f172a;border:1px solid #334155;color:#e2e8f0;padding:8px 10px;border-radius:8px;font-size:0.9rem;"
+                     placeholder="0">
+            </div>
+          </div>
+          <div style="display:flex;gap:10px;">
+            <button id="fc-calc-btn" onclick="loadFinancing()"
+                    style="flex:1;padding:10px;background:#22c55e;color:#052e16;border:none;border-radius:8px;font-weight:700;cursor:pointer;">
+              💳 Calculate Financing Options
+            </button>
+            <button onclick="openFinancingWidget()"
+                    style="padding:10px 14px;background:#1e293b;border:1px solid #334155;color:#e2e8f0;border-radius:8px;cursor:pointer;font-size:0.85rem;"
+                    title="Open shareable widget — text to homeowner">
+              🔗 Widget
+            </button>
+          </div>
+        </div>
+
+        <!-- Results -->
+        <div id="fc-results" style="color:#64748b;font-size:0.85rem;padding:8px 0;">
+          Enter a bill amount and click Calculate to see financing options.
+        </div>
+      </div>
+
+      <!-- Right: How it works + Pro Tip -->
+      <div>
+        <div class="card" style="margin-bottom:16px;">
+          <div class="card-title"><span>💡</span> Why This Closes Deals</div>
+          <div style="font-size:0.82rem;color:var(--muted);line-height:1.8;">
+            <p style="margin-bottom:10px;">Most homeowners assume solar is expensive. Show them the numbers:</p>
+            <div style="display:flex;flex-direction:column;gap:8px;">
+              <div style="display:flex;gap:8px;align-items:flex-start;">
+                <span style="color:#22c55e;flex-shrink:0">✅</span>
+                <span><strong>$0 down.</strong> No cash required — just a monthly payment that's less than their current bill.</span>
+              </div>
+              <div style="display:flex;gap:8px;align-items:flex-start;">
+                <span style="color:#22c55e;flex-shrink:0">✅</span>
+                <span><strong>Cash-flow positive Day 1.</strong> Their loan payment is often $50–$75/mo less than what they pay the utility right now.</span>
+              </div>
+              <div style="display:flex;gap:8px;align-items:flex-start;">
+                <span style="color:#f97316;flex-shrink:0">⚡</span>
+                <span><strong>30% Federal ITC.</strong> Cuts the system cost by $5,000–$10,000 — applied at tax time.</span>
+              </div>
+              <div style="display:flex;gap:8px;align-items:flex-start;">
+                <span style="color:#3b82f6;flex-shrink:0">📈</span>
+                <span><strong>Fixed payment forever.</strong> Their bill goes up 3.5%/yr. Their loan payment never changes.</span>
+              </div>
+              <div style="display:flex;gap:8px;align-items:flex-start;">
+                <span style="color:#a855f7;flex-shrink:0">🔗</span>
+                <span><strong>Shareable widget.</strong> Send the widget link — homeowners can run their own numbers between now and signing.</span>
+              </div>
+            </div>
+            <div style="background:#1e293b;border:1px solid #22c55e;border-radius:8px;padding:12px;margin-top:14px;">
+              <div style="font-size:0.75rem;font-weight:700;color:#22c55e;margin-bottom:4px;">PRO TIP 🎯</div>
+              <div style="font-size:0.8rem;">Pull this up at the door: "Before you decide, let me show you what your actual payment would be versus what you pay today." Most reps never show the comparison — that's why they lose deals.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title"><span>🔗</span> Embed on Your Website</div>
+          <div style="font-size:0.8rem;color:var(--muted);margin-bottom:8px;">Share with homeowners or embed on any page:</div>
+          <code style="font-size:0.72rem;color:#22c55e;display:block;word-break:break-all;background:#0f172a;padding:10px;border-radius:6px;">&lt;iframe src="http://localhost:8765/api/lead/financing/widget?bill=175&company=Elevate+Solar&phone=602-555-0100" width="700" height="700" frameborder="0"&gt;&lt;/iframe&gt;</code>
+          <button onclick="openFinancingWidget()" style="margin-top:10px;width:100%;padding:8px;background:#1e293b;border:1px solid #22c55e;color:#22c55e;border-radius:8px;cursor:pointer;font-size:0.82rem;">
+            🌐 Preview Widget Now
+          </button>
         </div>
       </div>
     </div>
@@ -1195,6 +1289,29 @@ function renderLead(d) {
         <img src="${imgUrl}" style="width:100%;border-radius:8px;object-fit:cover;height:260px;" onerror="this.parentElement.innerHTML='<div class=map-embed>Aerial imagery requires valid API key scope</div>'" />
       </div>
     </div>
+
+    <div class="card" style="margin-top:16px;">
+      <div class="card-title"><span>⚡</span> Quick Actions</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <button onclick="openFollowupForLead('${d.address}', ${d.monthly_bill_used||175})"
+                style="flex:1;min-width:140px;padding:10px;background:#3b82f6;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:0.85rem;font-weight:600;">
+          💬 Follow-Up Sequence
+        </button>
+        <button onclick="openFinancingForLead('${d.address}', ${d.monthly_bill_used||175})"
+                style="flex:1;min-width:140px;padding:10px;background:#22c55e;color:#052e16;border:none;border-radius:8px;cursor:pointer;font-size:0.85rem;font-weight:600;">
+          💳 Financing Options
+        </button>
+        <button onclick="openProposalForLead('${d.address}', '${(d.city||'').replace(/'/g,"\\'")}')"
+                style="flex:1;min-width:140px;padding:10px;background:#a855f7;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:0.85rem;font-weight:600;">
+          📄 Generate Proposal
+        </button>
+        <button id="ghl-push-btn" onclick="doGHLPush('${d.address}', ${d.monthly_bill_used||175})"
+                style="flex:1;min-width:140px;padding:10px;background:#1e293b;border:1px solid #f97316;color:#f97316;border-radius:8px;cursor:pointer;font-size:0.85rem;font-weight:600;">
+          🚀 Push to GHL CRM
+        </button>
+      </div>
+      <div id="ghl-push-result" style="margin-top:10px;font-size:0.82rem;"></div>
+    </div>
   `;
 }
 
@@ -1667,6 +1784,178 @@ function loadWaitingCost() {
       btn.disabled = false;
       btn.textContent = '⏳ Calculate Cost of Waiting';
     });
+}
+
+// ── Financing Calculator Tab ──────────────────────────────────────────────────
+function loadFinancing() {
+  const bill    = parseFloat(document.getElementById('fc-bill').value) || 175;
+  const address = (document.getElementById('fc-address').value || '').trim();
+  const state   = parseFloat(document.getElementById('fc-state').value) || 0;
+  const results = document.getElementById('fc-results');
+  const btn     = document.getElementById('fc-calc-btn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Calculating...';
+  results.innerHTML = '<div style="color:#64748b;padding:12px;">Loading financing options...</div>';
+
+  const params = new URLSearchParams({
+    monthly_bill: bill,
+    state_credit: state / 100,
+    enrich: address ? 'true' : 'false',
+  });
+  if (address) params.set('address', address);
+
+  fetch(`/api/lead/financing?${params}`)
+    .then(r => r.json())
+    .then(d => {
+      const fmt = v => '$' + Math.round(v || 0).toLocaleString('en-US');
+      const rec = d.recommended_option || {};
+      const opts = d.loan_options || [];
+      const pts  = d.talking_points || [];
+      const modeLabel = d.mode === 'enriched'
+        ? `✅ Real solar data: ${d.address}`
+        : `📊 Estimate — $${Math.round(bill)}/mo bill`;
+
+      // Build loan options table
+      const tableRows = opts.map(o => {
+        const cf = o.day1_cashflow_usd || 0;
+        const best = o.years === rec.years ? 'background:#0f2d1a;font-weight:700;' : '';
+        return `<tr style="${best}">
+          <td style="padding:6px 8px;">${o.years === rec.years ? '⭐ ' : ''}${o.label}</td>
+          <td style="padding:6px 8px;text-align:right;">${o.apr_pct}%</td>
+          <td style="padding:6px 8px;text-align:right;color:#e2e8f0;">${fmt(o.monthly_payment_usd)}/mo</td>
+          <td style="padding:6px 8px;text-align:right;color:${cf >= 0 ? '#22c55e' : '#f97316'};">
+            ${cf >= 0 ? '+' : ''}${fmt(cf)}/mo vs bill
+          </td>
+        </tr>`;
+      }).join('');
+
+      // Talking points
+      const ptHtml = pts.map(p => `<div style="display:flex;gap:8px;margin-bottom:6px;font-size:0.82rem;">
+        <span style="color:#22c55e;flex-shrink:0;">✅</span><span>${p}</span></div>`).join('');
+
+      // Solar profile card
+      let profileHtml = '';
+      if (d.mode === 'enriched' && d.panels_recommended) {
+        profileHtml = `
+        <div style="background:#1e293b;border:1px solid #22c55e;border-radius:10px;padding:16px;margin-bottom:14px;">
+          <div style="font-size:0.75rem;color:#22c55e;text-transform:uppercase;margin-bottom:10px;">🏡 Solar Profile — ${d.address}</div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;text-align:center;">
+            <div><div style="font-size:1.3rem;font-weight:800;color:#22c55e;">${d.panels_recommended}</div><div style="font-size:0.7rem;color:#64748b;">Panels</div></div>
+            <div><div style="font-size:1.3rem;font-weight:800;color:#22c55e;">${d.system_size_kw} kW</div><div style="font-size:0.7rem;color:#64748b;">System</div></div>
+            <div><div style="font-size:1.3rem;font-weight:800;color:#22c55e;">${fmt(d.annual_savings_usd)}/yr</div><div style="font-size:0.7rem;color:#64748b;">Savings</div></div>
+            <div><div style="font-size:1.3rem;font-weight:800;color:#f97316;">${fmt(d.gross_system_cost_usd)}</div><div style="font-size:0.7rem;color:#64748b;">Gross Cost</div></div>
+            <div><div style="font-size:1.3rem;font-weight:800;color:#f97316;">${fmt(d.federal_itc_usd)}</div><div style="font-size:0.7rem;color:#64748b;">ITC (30%)</div></div>
+            <div><div style="font-size:1.3rem;font-weight:800;color:#22c55e;">${fmt(d.net_cost_usd)}</div><div style="font-size:0.7rem;color:#64748b;">Net Cost</div></div>
+          </div>
+        </div>`;
+      }
+
+      results.innerHTML = `
+        <div style="font-size:0.75rem;color:#22c55e;margin-bottom:12px;">${modeLabel}</div>
+        ${profileHtml}
+        <div style="background:#1e293b;border:1px solid #22c55e;border-radius:10px;padding:16px;margin-bottom:14px;">
+          <div style="font-size:0.75rem;color:#64748b;text-transform:uppercase;margin-bottom:4px;">⭐ Best Option — ${rec.label || '25-Year Loan'}</div>
+          <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-bottom:10px;">
+            <div style="text-align:center;">
+              <div style="font-size:2rem;font-weight:800;color:#e2e8f0;">${fmt(rec.monthly_payment_usd)}/mo</div>
+              <div style="font-size:0.7rem;color:#64748b;">loan payment</div>
+            </div>
+            <div style="font-size:1.5rem;color:#64748b;">vs</div>
+            <div style="text-align:center;">
+              <div style="font-size:2rem;font-weight:800;color:#f97316;">${fmt(bill)}/mo</div>
+              <div style="font-size:0.7rem;color:#64748b;">current bill</div>
+            </div>
+            <div style="text-align:center;flex:1;">
+              <div style="font-size:2rem;font-weight:800;color:${(rec.day1_cashflow_usd||0)>=0?'#22c55e':'#ef4444'};">
+                ${(rec.day1_cashflow_usd||0)>=0?'+':''}${fmt(rec.day1_cashflow_usd)}/mo
+              </div>
+              <div style="font-size:0.7rem;color:#64748b;">Day 1 cash flow</div>
+            </div>
+          </div>
+        </div>
+        <div style="background:#1e293b;border:1px solid #334155;border-radius:10px;padding:16px;margin-bottom:14px;overflow-x:auto;">
+          <div style="font-size:0.75rem;color:#64748b;text-transform:uppercase;margin-bottom:10px;">💳 All Loan Options</div>
+          <table style="width:100%;border-collapse:collapse;font-size:0.84rem;">
+            <thead><tr style="color:#64748b;font-size:0.72rem;border-bottom:1px solid #334155;">
+              <th style="text-align:left;padding:4px 8px;">Term</th>
+              <th style="text-align:right;padding:4px 8px;">APR</th>
+              <th style="text-align:right;padding:4px 8px;">Payment</th>
+              <th style="text-align:right;padding:4px 8px;">vs Bill</th>
+            </tr></thead>
+            <tbody>${tableRows}</tbody>
+          </table>
+        </div>
+        <div style="background:#1e293b;border:1px solid #334155;border-radius:10px;padding:16px;margin-bottom:14px;">
+          <div style="font-size:0.75rem;color:#64748b;text-transform:uppercase;margin-bottom:10px;">💡 Talking Points</div>
+          ${ptHtml}
+        </div>
+        <button onclick="openFinancingWidget()" style="width:100%;padding:12px;background:#22c55e;color:#052e16;border:none;border-radius:10px;font-weight:700;cursor:pointer;font-size:0.95rem;">
+          🔗 Open Shareable Widget (Send to Homeowner)
+        </button>`;
+    })
+    .catch(err => {
+      results.innerHTML = '<div style="color:#ef4444;padding:12px;">Error: ' + err + '</div>';
+    })
+    .finally(() => {
+      btn.disabled = false;
+      btn.textContent = '💳 Calculate Financing Options';
+    });
+}
+
+function openFinancingWidget() {
+  const bill    = parseFloat(document.getElementById('fc-bill').value) || 175;
+  const address = (document.getElementById('fc-address').value || '').trim();
+  let url = `/api/lead/financing/widget?bill=${bill}&company=Elevate+Solar&phone=602-555-0192`;
+  if (address) url += `&address=${encodeURIComponent(address)}`;
+  window.open(url, '_blank');
+}
+
+// Called from Lead tab or other tabs to pre-fill financing
+function openFinancingForLead(addr, bill) {
+  if (addr) document.getElementById('fc-address').value = addr;
+  if (bill) document.getElementById('fc-bill').value = bill;
+  switchTab('financing');
+  setTimeout(loadFinancing, 200);
+}
+
+// ── GHL Push (inline from Lead tab) ──────────────────────────────────────────
+function doGHLPush(address, bill) {
+  const resultEl = document.getElementById('ghl-push-result');
+  const btn = document.getElementById('ghl-push-btn');
+  if (resultEl) resultEl.innerHTML = '<span style="color:#64748b;">Pushing to GHL...</span>';
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Pushing...'; }
+
+  fetch('/api/lead/ghl-push', {
+    method:  'POST',
+    headers: {'Content-Type': 'application/json'},
+    body:    JSON.stringify({ address: address, monthly_bill: bill || 175 }),
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (resultEl) {
+      if (d.pushed) {
+        resultEl.innerHTML = `<span style="color:#22c55e;">✅ Contact pushed! ID: ${d.contact_id} — <a href="${d.url}" target="_blank" style="color:#22c55e;">${d.url}</a></span>`;
+      } else if (d.skipped) {
+        resultEl.innerHTML = `<span style="color:#f97316;">⚠️ ${d.reason}</span>`;
+      } else {
+        resultEl.innerHTML = `<span style="color:#ef4444;">❌ ${d.error || 'Push failed'}</span>`;
+      }
+    }
+    if (btn) { btn.disabled = false; btn.textContent = '🚀 Push to GHL CRM'; }
+  })
+  .catch(err => {
+    if (resultEl) resultEl.innerHTML = `<span style="color:#ef4444;">Error: ${err}</span>`;
+    if (btn) { btn.disabled = false; btn.textContent = '🚀 Push to GHL CRM'; }
+  });
+}
+
+function pushToGHL(address, bill, firstName, lastName) {
+  return fetch('/api/lead/ghl-push', {
+    method:  'POST',
+    headers: {'Content-Type': 'application/json'},
+    body:    JSON.stringify({ address: address||'', monthly_bill: bill||175,
+                              first_name: firstName||'Solar', last_name: lastName||'Lead' }),
+  }).then(r => r.json());
 }
 </script>
 </body>
