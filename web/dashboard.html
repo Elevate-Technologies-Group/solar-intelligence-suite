@@ -154,6 +154,7 @@
     <div class="tab" onclick="switchTab('history')" id="history-tab">📋 Lead History</div>
     <div class="tab" onclick="switchTab('followup')">💬 Follow-Up Sequences</div>
     <div class="tab" onclick="switchTab('territory-report')">📊 Territory Reports</div>
+    <div class="tab" onclick="switchTab('lead-map')">🗺️ Lead Map</div>
     <div class="tab" onclick="switchTab('about')">📖 How It Works</div>
   </div>
 
@@ -540,6 +541,57 @@
   </div>
 
   <!-- ABOUT PANEL -->
+  <div id="tab-lead-map" class="panel">
+    <div class="grid-2" style="margin-bottom:12px">
+      <div class="card">
+        <div class="card-title"><span>🗺️</span> Interactive Lead Map</div>
+        <p style="font-size:13px;color:var(--muted);margin-bottom:14px">
+          All cached leads plotted on a satellite map. Color-coded pins: 🔴 HOT · 🟠 WARM · 🔵 COOL.<br>
+          Click any pin for full lead details, savings, and action buttons.
+        </p>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn btn-primary" onclick="openLeadMapNewTab()">🔗 Open Full Map (New Tab)</button>
+          <button class="btn btn-secondary" onclick="downloadLeadMap()">⬇️ Download HTML</button>
+          <button class="btn btn-secondary" onclick="loadLeadMapPreview()">👁️ Preview Here</button>
+          <button class="btn btn-secondary" onclick="refreshLeadMap()">🔄 Refresh</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title"><span>📊</span> Map Stats</div>
+        <div id="map-stats-row" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px">
+          <div style="background:var(--bg);border-radius:8px;padding:10px;text-align:center">
+            <div style="font-size:22px;font-weight:700;color:var(--accent)" id="map-stat-total">—</div>
+            <div style="font-size:10px;color:var(--muted);text-transform:uppercase">Leads</div>
+          </div>
+          <div style="background:var(--bg);border-radius:8px;padding:10px;text-align:center">
+            <div style="font-size:22px;font-weight:700;color:#ef4444" id="map-stat-hot">—</div>
+            <div style="font-size:10px;color:var(--muted);text-transform:uppercase">🔥 HOT</div>
+          </div>
+          <div style="background:var(--bg);border-radius:8px;padding:10px;text-align:center">
+            <div style="font-size:22px;font-weight:700;color:#f97316" id="map-stat-warm">—</div>
+            <div style="font-size:10px;color:var(--muted);text-transform:uppercase">🌤 WARM</div>
+          </div>
+          <div style="background:var(--bg);border-radius:8px;padding:10px;text-align:center">
+            <div style="font-size:22px;font-weight:700;color:var(--green)" id="map-stat-pipeline">—</div>
+            <div style="font-size:10px;color:var(--muted);text-transform:uppercase">Pipeline/yr</div>
+          </div>
+        </div>
+        <div style="font-size:12px;color:var(--muted)">
+          💡 <b>Pro Tip:</b> Open the full map on a second monitor while working leads.
+          Pins show real-time score from the solar API — 19+ leads plotted from cache.
+        </div>
+      </div>
+    </div>
+    <!-- Iframe preview -->
+    <div id="map-preview-container" style="display:none;margin-top:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <span style="font-size:13px;color:var(--muted)">Map Preview (embedded)</span>
+        <button class="btn btn-secondary" style="padding:4px 12px;font-size:12px" onclick="document.getElementById('map-preview-container').style.display='none'">✕ Close</button>
+      </div>
+      <iframe id="lead-map-iframe" src="" style="width:100%;height:560px;border:1px solid var(--border);border-radius:10px;background:#0f172a"></iframe>
+    </div>
+  </div>
+
   <div id="tab-about" class="panel">
     <div class="grid-2">
       <div class="card">
@@ -737,11 +789,54 @@ function switchTab(name) {
   document.getElementById('tab-' + name).classList.add('active');
   if (name === 'history') loadHistory();
   if (name === 'territory-report') loadCachedTerritoryList();
+  if (name === 'lead-map') loadLeadMapStats();
   if (name === 'canvass') {
     // pre-fill with a Gilbert example if empty
     const ca = document.getElementById('canvass-address');
     if (!ca.value) ca.value = '1905 E Marquette Dr, Gilbert, AZ 85234';
   }
+}
+
+// ── Lead Map ──────────────────────────────────────────────────────────────────
+
+async function loadLeadMapStats() {
+  try {
+    const r = await fetch(`${API}/api/leads/map/data`);
+    if (!r.ok) return;
+    const d = await r.json();
+    document.getElementById('map-stat-total').textContent = d.total || '—';
+    document.getElementById('map-stat-hot').textContent   = d.hot_leads || 0;
+    document.getElementById('map-stat-warm').textContent  = d.warm_leads || 0;
+    const pipeline = (d.features||[]).reduce((s,f) => {
+      const p = f.properties;
+      return (p.priority==='HOT'||p.priority==='WARM') ? s+(p.annual_savings_yr1_usd||0) : s;
+    }, 0);
+    document.getElementById('map-stat-pipeline').textContent = '$' + pipeline.toLocaleString();
+  } catch(e) { /* silent fail */ }
+}
+
+function openLeadMapNewTab() {
+  window.open(`${API}/api/leads/map`, '_blank');
+}
+
+function downloadLeadMap() {
+  const a = document.createElement('a');
+  a.href = `${API}/api/leads/map?download=true`;
+  a.download = 'solar_lead_map.html';
+  a.click();
+}
+
+function loadLeadMapPreview() {
+  const container = document.getElementById('map-preview-container');
+  const iframe    = document.getElementById('lead-map-iframe');
+  container.style.display = 'block';
+  iframe.src = `${API}/api/leads/map`;
+}
+
+function refreshLeadMap() {
+  loadLeadMapStats();
+  const iframe = document.getElementById('lead-map-iframe');
+  if (iframe.src) iframe.src = iframe.src; // force reload
 }
 
 // ── Follow-Up Sequence ────────────────────────────────────────────────────────

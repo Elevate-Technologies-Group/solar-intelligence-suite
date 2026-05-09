@@ -52,6 +52,18 @@ except Exception:
     def notify_batch_results(*a, **kw): return False
     def notify_territory_scan(*a, **kw): return False
 
+# Lead map generator import (optional — graceful if missing)
+try:
+    from scripts.build_lead_map import (
+        collect_all_leads as _collect_map_leads,
+        leads_to_geojson  as _leads_to_geojson,
+        generate_map_html as _gen_map_html,
+        save_map          as _save_map,
+    )
+    _lead_map_enabled = True
+except Exception:
+    _lead_map_enabled = False
+
 app = FastAPI(
     title="Solar Intelligence Suite",
     description="AI-powered solar lead enrichment and territory analysis for solar sales teams",
@@ -861,6 +873,54 @@ async def territory_report_json(
         ),
         "prospects": prospects,
         "report_url": f"/api/territory/report?zip_code={zip_code}",
+    }
+
+
+@app.get("/api/leads/map", response_class=HTMLResponse)
+async def leads_map_html(
+    title: str = Query("Solar Lead Map", description="Map page title"),
+    download: bool = Query(False, description="Return as file download"),
+):
+    """
+    Interactive HTML map of all cached solar leads — color-coded pins.
+    Red=HOT, Orange=WARM, Blue=COOL. Click any pin for full lead details.
+    Example: GET /api/leads/map
+    """
+    if not _lead_map_enabled:
+        raise HTTPException(status_code=503, detail="Lead map module unavailable.")
+
+    api_key = os.environ.get("GOOGLE_MAPS_API_KEY", "")
+    leads   = _collect_map_leads()
+    geojson = _leads_to_geojson(leads)
+    html    = _gen_map_html(geojson, google_maps_key=api_key, title=title)
+    try:
+        _save_map(html)
+    except Exception:
+        pass
+
+    if download:
+        from fastapi.responses import Response
+        return Response(content=html, media_type="text/html",
+                        headers={"Content-Disposition": "attachment; filename=solar_lead_map.html"})
+    return HTMLResponse(content=html)
+
+
+@app.get("/api/leads/map/data")
+async def leads_map_geojson():
+    """
+    All cached leads as GeoJSON FeatureCollection — for custom map integrations.
+    """
+    if not _lead_map_enabled:
+        raise HTTPException(status_code=503, detail="Lead map module unavailable.")
+    leads   = _collect_map_leads()
+    geojson = _leads_to_geojson(leads)
+    features = geojson.get("features", [])
+    return {
+        "type":       "FeatureCollection",
+        "total":      len(features),
+        "hot_leads":  sum(1 for f in features if f["properties"]["priority"] == "HOT"),
+        "warm_leads": sum(1 for f in features if f["properties"]["priority"] == "WARM"),
+        "features":   features,
     }
 
 
