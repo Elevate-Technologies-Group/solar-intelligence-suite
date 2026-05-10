@@ -165,6 +165,7 @@
     <div class="tab" onclick="switchTab('widget')">🌐 Website Widget</div>
     <div class="tab" onclick="switchTab('appt-setter')">📞 Appt Setter</div>
     <div class="tab" onclick="switchTab('drip-campaign')">💧 Drip Campaign</div>
+    <div class="tab" onclick="switchTab('morning-briefing')">☀️ Morning Briefing</div>
     <div class="tab" onclick="switchTab('about')">📖 How It Works</div>
   </div>
 
@@ -1558,6 +1559,78 @@
         <strong style="color:#f1f5f9">📥 GHL Import:</strong> Click CSV to download a GHL-importable spreadsheet. Each row = one message with send date, channel, subject, body, and lead data. Import into your GHL workflow as a custom CSV trigger. |
         <strong style="color:#f1f5f9">API:</strong> <code style="color:#38bdf8">GET /api/lead/drip-campaign?address=...&amp;stage=new&amp;format=csv</code>
       </div>
+    </div>
+  </div>
+
+  <!-- MORNING BRIEFING PANEL -->
+  <div id="tab-morning-briefing" class="panel">
+    <div class="card">
+      <div class="card-title"><span>☀️</span> Morning Rep Briefing</div>
+      <p style="color:#94a3b8;margin-bottom:1.2rem">Your daily AI-powered prep sheet: who to call, follow-up priority, weather conditions, door-knock openers, and a pipeline snapshot — all in one place.</p>
+      <div class="grid-3" style="margin-bottom:1rem">
+        <div>
+          <label class="label">Rep Name</label>
+          <input id="mb-rep" class="input" placeholder="Your Name" value="Solar Rep">
+        </div>
+        <div>
+          <label class="label">City / Market</label>
+          <input id="mb-city" class="input" placeholder="Phoenix,AZ" value="Phoenix,AZ">
+        </div>
+        <div style="display:flex;align-items:flex-end">
+          <button class="btn" onclick="generateBriefing()" style="width:100%">☀️ Generate Briefing</button>
+        </div>
+      </div>
+      <div id="mb-status" style="display:none;color:#94a3b8;font-size:0.85rem;margin-bottom:0.5rem"></div>
+    </div>
+
+    <!-- Stats bar -->
+    <div id="mb-stats" style="display:none" class="grid-4" style="margin-bottom:1rem">
+      <div class="stat-card"><div class="stat-value" id="mb-stat-calls">—</div><div class="stat-label">Calls Today</div></div>
+      <div class="stat-card"><div class="stat-value" id="mb-stat-temp" style="color:#f59e0b">—</div><div class="stat-label">Today's High</div></div>
+      <div class="stat-card"><div class="stat-value" id="mb-stat-canvass" style="color:#10b981">—</div><div class="stat-label">Canvassing</div></div>
+      <div class="stat-card"><div class="stat-value" id="mb-stat-pipeline" style="color:#a78bfa">—</div><div class="stat-label">Pipeline Value</div></div>
+    </div>
+
+    <!-- Briefing output -->
+    <div id="mb-output" style="display:none">
+      <div class="grid-2">
+        <!-- Action List -->
+        <div class="card" id="mb-actions-card">
+          <div class="card-title"><span>📋</span> Today's Action List</div>
+          <div id="mb-actions-content" style="font-size:0.87rem"></div>
+        </div>
+        <!-- Weather + Openers -->
+        <div>
+          <div class="card" style="margin-bottom:1rem">
+            <div class="card-title"><span>☁️</span> Field Conditions</div>
+            <div id="mb-weather-content" style="font-size:0.87rem"></div>
+          </div>
+          <div class="card">
+            <div class="card-title"><span>💬</span> Door-Knock Openers</div>
+            <div id="mb-openers-content" style="font-size:0.87rem;color:#94a3b8;line-height:1.7"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Hot prospects -->
+      <div class="card" id="mb-prospects-card" style="display:none;margin-top:1rem">
+        <div class="card-title"><span>🔥</span> Hot Prospects from Enrichment Cache</div>
+        <div id="mb-prospects-content"></div>
+      </div>
+
+      <!-- Full text download -->
+      <div style="margin-top:1rem;display:flex;gap:0.5rem">
+        <button class="btn btn-secondary" onclick="downloadBriefing()">⬇️ Download Briefing TXT</button>
+        <button class="btn btn-secondary" onclick="copyBriefing()">📋 Copy to Clipboard</button>
+      </div>
+    </div>
+
+    <!-- API reference -->
+    <div class="card" style="margin-top:1.5rem;background:#0f172a;border-color:#1e293b">
+      <div style="font-size:0.8rem;color:#64748b;margin-bottom:0.5rem">API Reference</div>
+      <code style="color:#38bdf8;font-size:0.78rem">GET /api/lead/morning-briefing?rep=Jake+Rivera&city=Phoenix%2CAZ</code><br>
+      <code style="color:#38bdf8;font-size:0.78rem">GET /api/lead/morning-briefing?format=text</code><br>
+      <code style="color:#94a3b8;font-size:0.75rem">POST /api/lead/morning-briefing  { rep_name, city, format }</code>
     </div>
   </div>
 
@@ -3858,6 +3931,139 @@ function openDripForLead(address, bill, stage) {
   if (bill) document.getElementById('drip-bill').value = bill;
   if (stage) document.getElementById('drip-stage').value = stage;
   setTimeout(loadDripCampaign, 200);
+}
+
+// ── Morning Briefing tab ────────────────────────────────────────────────────
+let mbBriefingText = '';
+
+async function generateBriefing() {
+  const rep  = document.getElementById('mb-rep').value.trim() || 'Solar Rep';
+  const city = document.getElementById('mb-city').value.trim() || 'Phoenix,AZ';
+  const status = document.getElementById('mb-status');
+  status.style.display = 'block';
+  status.textContent = '⏳ Generating your morning briefing...';
+
+  try {
+    const params = new URLSearchParams({ rep, city, format: 'json' });
+    const res = await fetch('/api/lead/morning-briefing?' + params.toString());
+    if (!res.ok) throw new Error(await res.text());
+    const d = await res.json();
+
+    // Stats bar
+    const stats = d.pipeline_stats || {};
+    const weather = d.weather || {};
+    document.getElementById('mb-stat-calls').textContent   = d.total_calls_today || 0;
+    document.getElementById('mb-stat-temp').textContent    = (weather.max_temp_f || weather.temp_f || '—') + '°F';
+    document.getElementById('mb-stat-canvass').textContent = (d.canvassing_label || '—') + ' (' + (d.canvassing_score || 0) + '/10)';
+    const pval = stats.pipeline_value || 0;
+    document.getElementById('mb-stat-pipeline').textContent = pval ? '$' + pval.toLocaleString() : '—';
+    document.getElementById('mb-stats').style.display = 'grid';
+
+    // Field conditions
+    const wEl = document.getElementById('mb-weather-content');
+    const w = weather;
+    const cvLabel = d.canvassing_label || '—';
+    const cvScore = d.canvassing_score || 0;
+    const cvColor = cvScore >= 8 ? '#10b981' : cvScore >= 6 ? '#f59e0b' : cvScore >= 4 ? '#f97316' : '#ef4444';
+    wEl.innerHTML = `
+      <div style="margin-bottom:0.5rem"><strong style="color:#f1f5f9">${w.desc || 'Clear'}, ${w.temp_f || '—'}°F</strong>  <span style="color:#64748b">High ${w.max_temp_f || '—'}° / Low ${w.min_temp_f || '—'}°</span></div>
+      <div style="margin-bottom:0.5rem;color:#94a3b8">🌅 ${w.sunrise || '—'} → 🌇 ${w.sunset || '—'} &nbsp;|&nbsp; Wind: ${w.wind_mph || 0} mph &nbsp;|&nbsp; UV: ${w.uv_index || 0}</div>
+      <div><strong style="color:#f1f5f9">Door-Knock: </strong><span style="color:${cvColor}"><strong>${cvLabel} (${cvScore}/10)</strong></span></div>`;
+
+    // Action list
+    const ai = d.action_items || {};
+    const leads = d.pipeline_stats;
+    const actEl = document.getElementById('mb-actions-content');
+    let actHtml = '';
+    let num = 1;
+    const renderBucket = (items, color, icon, action) => {
+      if (!items || !items.length) return;
+      actHtml += `<div style="margin-bottom:0.8rem"><strong style="color:${color}">${icon} ${action}</strong></div>`;
+      items.forEach(addr => {
+        actHtml += `<div style="margin-bottom:0.5rem;padding:0.5rem;background:#1e293b;border-radius:6px;border-left:3px solid ${color}">
+          <div style="color:#f1f5f9;font-size:0.85rem">${num++}. ${addr.split(',')[0]}</div>
+          <div style="color:#64748b;font-size:0.75rem">${addr}</div>
+        </div>`;
+      });
+    };
+    renderBucket(ai.urgent,   '#ef4444', '🔴', 'CALL NOW — Gone Cold');
+    renderBucket(ai.followup, '#f59e0b', '🟡', 'FOLLOW UP');
+    renderBucket(ai.nurture,  '#a78bfa', '🟣', 'CHECK IN — Proposal Sent');
+    renderBucket(ai.fresh,    '#10b981', '🟢', 'FIRST TOUCH — New Lead');
+    if (!actHtml) actHtml = '<div style="color:#64748b">No active pipeline leads. Add some via the Pipeline CRM tab.</div>';
+    actEl.innerHTML = actHtml;
+
+    // Door-knock openers
+    const opEl = document.getElementById('mb-openers-content');
+    opEl.innerHTML = `
+      <div style="margin-bottom:0.8rem"><strong style="color:#38bdf8">Weather Hook:</strong><br>
+        <span style="font-style:italic">${w.max_temp_f > 100
+          ? `"On a scorching ${w.max_temp_f}°F day like today, your AC is running at full blast — that's exactly where solar savings are biggest."`
+          : w.uv_index >= 7
+          ? `"With UV at ${w.uv_index} today, you can literally feel the solar energy — let me show you what that means for your bill..."`
+          : `"Most homeowners in this area are saving over $150/month — I'm going door to door today to see if your home qualifies."`
+        }</span></div>
+      <div style="margin-bottom:0.8rem"><strong style="color:#38bdf8">Neighbor Proof:</strong><br>
+        <span style="font-style:italic">"I just helped a neighbor two streets over lock in $2,100/yr in savings. Their install was last month — they're thrilled. Is your home south-facing?"</span></div>
+      <div><strong style="color:#38bdf8">ITC Urgency:</strong><br>
+        <span style="font-style:italic">"The 30% federal tax credit is still active — homeowners who install this year pocket an extra $6-8K vs waiting."</span></div>`;
+
+    // Hot prospects
+    const prospects = d.hot_prospects || [];
+    if (prospects.length) {
+      const pEl = document.getElementById('mb-prospects-content');
+      pEl.innerHTML = prospects.slice(0, 5).map((p, i) => {
+        const medals = ['🥇','🥈','🥉','4.','5.'];
+        const pcolor = p.priority === 'HOT' ? '#ef4444' : '#f59e0b';
+        return `<div style="display:flex;align-items:center;padding:0.6rem 0;border-bottom:1px solid #1e293b;gap:0.8rem">
+          <div style="font-size:1.1rem">${medals[i]}</div>
+          <div style="flex:1">
+            <div><strong style="color:#f1f5f9">${p.address.split(',')[0]}</strong> <span style="color:#64748b;font-size:0.78rem">${p.address.split(',').slice(1,3).join(',').trim()}</span></div>
+            <div style="color:${pcolor};font-size:0.78rem">${p.priority} — ${p.score}/100 ${p.grade}</div>
+          </div>
+          <div style="text-align:right;color:#94a3b8;font-size:0.8rem">${p.yr1_savings ? '$' + p.yr1_savings.toLocaleString() + '/yr' : ''}</div>
+        </div>`;
+      }).join('');
+      document.getElementById('mb-prospects-card').style.display = 'block';
+    }
+
+    // Store full text for download
+    mbBriefingText = `MORNING BRIEFING — ${d.date || new Date().toDateString()}\nRep: ${rep}\n\n` + JSON.stringify(d, null, 2);
+
+    document.getElementById('mb-output').style.display = 'block';
+    status.textContent = `✅ Briefing ready — ${d.total_calls_today || 0} contacts today, ${d.canvassing_label || ''} field conditions`;
+  } catch(e) {
+    status.textContent = '❌ Error: ' + e.message;
+  }
+}
+
+async function downloadBriefing() {
+  try {
+    const rep  = document.getElementById('mb-rep').value.trim() || 'Solar Rep';
+    const city = document.getElementById('mb-city').value.trim() || 'Phoenix,AZ';
+    const params = new URLSearchParams({ rep, city, format: 'text' });
+    const res = await fetch('/api/lead/morning-briefing?' + params.toString());
+    const txt = await res.text();
+    const blob = new Blob([txt], {type: 'text/plain'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `morning_briefing_${new Date().toISOString().slice(0,10)}.txt`;
+    a.click();
+  } catch(e) { alert('Error: ' + e.message); }
+}
+
+async function copyBriefing() {
+  try {
+    const rep  = document.getElementById('mb-rep').value.trim() || 'Solar Rep';
+    const city = document.getElementById('mb-city').value.trim() || 'Phoenix,AZ';
+    const params = new URLSearchParams({ rep, city, format: 'text' });
+    const res = await fetch('/api/lead/morning-briefing?' + params.toString());
+    const txt = await res.text();
+    await navigator.clipboard.writeText(txt);
+    const btn = event.target;
+    btn.textContent = '✅ Copied!';
+    setTimeout(() => btn.textContent = '📋 Copy to Clipboard', 2000);
+  } catch(e) { alert('Error: ' + e.message); }
 }
 
 </script>

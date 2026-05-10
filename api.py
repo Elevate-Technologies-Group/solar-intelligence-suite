@@ -2713,5 +2713,59 @@ async def drip_stages():
         raise HTTPException(500, f"Error: {e}")
 
 
+# ──────────────────────────────────────────────────────────────────────────────
+# MORNING REP BRIEFING
+# ──────────────────────────────────────────────────────────────────────────────
+
+@app.get("/api/lead/morning-briefing",
+    summary="Morning rep briefing — who to call today",
+    tags=["Lead Intelligence"])
+async def morning_briefing_get(
+    rep: str = Query("Solar Rep", description="Rep name"),
+    city: str = Query("Phoenix,AZ", description="City for weather (e.g. Phoenix,AZ)"),
+    format: str = Query("json", description="'json' or 'text'"),
+):
+    """
+    Daily morning briefing: pipeline follow-ups, hot leads, weather conditions,
+    door-knock openers, and a pipeline snapshot.
+    """
+    try:
+        from scripts.morning_briefing import generate_briefing, save_briefing
+        result = generate_briefing(rep_name=rep, city=city, use_color=False)
+        if format == "text":
+            from fastapi.responses import PlainTextResponse
+            return PlainTextResponse(result["plain_text"])
+        # Save for reference
+        save_briefing(result["plain_text"])
+        result.pop("formatted_text", None)
+        result.pop("plain_text", None)
+        return JSONResponse(result)
+    except Exception as e:
+        raise HTTPException(500, f"Morning briefing error: {e}")
+
+
+@app.post("/api/lead/morning-briefing",
+    summary="Morning rep briefing (POST)",
+    tags=["Lead Intelligence"])
+async def morning_briefing_post(request: Request):
+    """POST version: body {rep_name, city, format}"""
+    try:
+        from scripts.morning_briefing import generate_briefing, save_briefing
+        body = await request.json()
+        rep  = body.get("rep_name", "Solar Rep")
+        city = body.get("city", "Phoenix,AZ")
+        fmt  = body.get("format", "json")
+        result = generate_briefing(rep_name=rep, city=city, use_color=False)
+        if fmt == "text":
+            from fastapi.responses import PlainTextResponse
+            return PlainTextResponse(result["plain_text"])
+        save_briefing(result["plain_text"])
+        result.pop("formatted_text", None)
+        result.pop("plain_text", None)
+        return JSONResponse(result)
+    except Exception as e:
+        raise HTTPException(500, f"Morning briefing error: {e}")
+
+
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8765)
