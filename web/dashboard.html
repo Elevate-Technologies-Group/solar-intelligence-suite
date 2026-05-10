@@ -1080,6 +1080,7 @@
       <h2 style="color:var(--accent);font-size:20px;">📊 Lead Pipeline CRM</h2>
       <div style="display:flex;gap:10px;">
         <button class="btn btn-secondary" style="width:auto;padding:8px 18px;font-size:13px;" onclick="importCacheLeads()">⬆️ Import Cache Leads</button>
+        <button class="btn btn-secondary" style="width:auto;padding:8px 18px;font-size:13px;background:var(--accent2);" id="pl-enrich-btn" onclick="enrichPipelineLeads()">☀️ Enrich All Leads</button>
         <button class="btn btn-primary" style="width:auto;padding:8px 18px;font-size:13px;" onclick="loadPipeline()">🔄 Refresh</button>
       </div>
     </div>
@@ -3474,6 +3475,36 @@ async function importCacheLeads() {
   document.getElementById('pl-add-status').innerHTML =
     `<span style="color:var(--green);">✓ Imported ${data.imported} leads from cache!</span>`;
   loadPipeline();
+}
+
+async function enrichPipelineLeads(force = false) {
+  const btn = document.getElementById('pl-enrich-btn');
+  const statusEl = document.getElementById('pl-add-status');
+  btn.disabled = true;
+  btn.textContent = '⏳ Enriching...';
+  statusEl.innerHTML = '<span style="color:var(--accent)">☀️ Calling Google Solar API for each lead...</span>';
+  try {
+    const res = await fetch('/api/pipeline/enrich', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({force: force, workers: 3})
+    });
+    const data = await res.json();
+    if (data.ok) {
+      const msg = data.total === 0
+        ? '✅ All leads already have solar data!'
+        : `✅ Enriched ${data.enriched}/${data.total} leads — ${data.hot} HOT, ${data.warm} WARM`;
+      statusEl.innerHTML = `<span style="color:var(--green);">${msg}</span>`;
+      loadPipeline();
+    } else {
+      statusEl.innerHTML = `<span style="color:var(--red);">⚠️ Enrichment failed</span>`;
+    }
+  } catch(e) {
+    statusEl.innerHTML = `<span style="color:var(--red);">⚠️ ${e.message}</span>`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '☀️ Enrich All Leads';
+  }
 }
 
 // ── Report Card ────────────────────────────────────────────────────────────────

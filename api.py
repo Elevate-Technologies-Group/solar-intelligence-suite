@@ -2086,6 +2086,53 @@ async def pipeline_import(max_leads: int = 20):
         raise HTTPException(500, f"Pipeline import error: {e}")
 
 
+@app.post("/api/pipeline/enrich",
+    summary="Enrich pipeline leads with real Google Solar API data",
+    tags=["Pipeline CRM"])
+async def pipeline_enrich(body: dict = Body(default={})):
+    """
+    Enrich pipeline CRM leads with real satellite solar data.
+
+    Body (all optional):
+    - force: bool — re-enrich ALL leads even if already scored (default false)
+    - lead_ids: list[int] — specific lead IDs to enrich (default: all un-enriched)
+    - workers: int — parallel threads, max 5 (default 3)
+
+    Returns enrichment summary: total, enriched, failed, hot, warm, per-lead results.
+    """
+    try:
+        from scripts.enrich_pipeline import enrich_pipeline_leads
+        force    = bool(body.get("force", False))
+        lead_ids = body.get("lead_ids") or None
+        workers  = min(int(body.get("workers", 3)), 5)
+
+        result = enrich_pipeline_leads(
+            force=force,
+            lead_ids=lead_ids,
+            workers=workers,
+            color=False,
+        )
+        return JSONResponse({"ok": True, **result})
+    except Exception as e:
+        raise HTTPException(500, f"Pipeline enrichment error: {e}")
+
+
+@app.get("/api/pipeline/enrich",
+    summary="Enrich un-enriched pipeline leads (GET convenience)",
+    tags=["Pipeline CRM"])
+async def pipeline_enrich_get(
+    force:   bool = Query(False, description="Re-enrich all leads even if scored"),
+    workers: int  = Query(3, description="Parallel workers (max 5)"),
+):
+    """GET version — enrich all un-enriched pipeline leads."""
+    try:
+        from scripts.enrich_pipeline import enrich_pipeline_leads
+        result = enrich_pipeline_leads(force=force, workers=min(workers, 5), color=False)
+        return JSONResponse({"ok": True, **result})
+    except Exception as e:
+        raise HTTPException(500, f"Pipeline enrichment error: {e}")
+
+
 
 # ─── Report Card Endpoints ────────────────────────────────────────────────────
 
