@@ -2531,5 +2531,187 @@ async def appointment_setter_post(request: Request):
         raise HTTPException(500, f"Appointment setter error: {e}")
 
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 90-Day Drip Campaign Generator
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.get("/api/lead/drip-campaign",
+    summary="90-day lead nurture drip campaign (GET, address or bill-only)",
+    tags=["Lead Intelligence"])
+async def drip_campaign_get(
+    address: str = None,
+    monthly_bill: float = 175.0,
+    utility_rate: float = 0.14,
+    stage: str = "new",
+    contact_name: str = "",
+    email: str = "",
+    rep_name: str = "Your Solar Rep",
+    rep_phone: str = "602-555-0100",
+    company: str = "Elevate Solar",
+    format: str = "json",
+):
+    """
+    Generate a 90-day drip campaign for a lead.
+
+    - **address** – home address (optional; enriches via Solar API + cache)
+    - **stage** – pipeline stage: new | contacted | qualified | proposed
+    - **format** – json (default) | csv (GHL-importable CSV text)
+
+    Returns personalized email + SMS sequence with real solar data injected.
+    """
+    try:
+        from scripts.drip_campaign import generate_drip_campaign, export_csv
+
+        valid_stages = ["new", "contacted", "qualified", "proposed"]
+        if stage not in valid_stages:
+            raise HTTPException(400, f"stage must be one of: {valid_stages}")
+
+        lead = {}
+        if address:
+            try:
+                lead = enrich_lead(address, monthly_bill, utility_rate)
+                if lead.get("error"):
+                    lead = {"address": address}
+            except Exception:
+                lead = {"address": address}
+
+        campaign = generate_drip_campaign(
+            lead, stage=stage, monthly_bill=monthly_bill,
+            rep_name=rep_name, rep_phone=rep_phone,
+            company=company, contact_name=contact_name, email=email
+        )
+
+        if format == "csv":
+            csv_text = export_csv(campaign)
+            from fastapi.responses import PlainTextResponse
+            return PlainTextResponse(csv_text, media_type="text/csv",
+                headers={"Content-Disposition": f'attachment; filename="drip_{stage}.csv"'})
+
+        # Strip csv_rows from JSON response (large, redundant with messages)
+        campaign.pop("csv_rows", None)
+        return JSONResponse(campaign)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"Drip campaign error: {e}")
+
+
+@app.post("/api/lead/drip-campaign",
+    summary="90-day lead nurture drip campaign (POST)",
+    tags=["Lead Intelligence"])
+async def drip_campaign_post(request: Request):
+    """
+    POST version — full control over all parameters.
+
+    Body:
+    ```json
+    {
+      "address": "1905 E Marquette Dr, Gilbert AZ",
+      "monthly_bill": 175,
+      "utility_rate": 0.14,
+      "stage": "new",
+      "contact_name": "Sarah Martinez",
+      "email": "sarah@example.com",
+      "rep_name": "Jake Rivera",
+      "rep_phone": "602-555-0100",
+      "company": "Elevate Solar",
+      "pipeline_lead_id": 1,
+      "format": "json"
+    }
+    ```
+    Set **pipeline_lead_id** to auto-load contact info + stage from pipeline DB.
+    Set **format**: "json" | "csv" for GHL-importable output.
+    """
+    try:
+        from scripts.drip_campaign import generate_drip_campaign, export_csv
+
+        body = await request.json()
+        address      = body.get("address")
+        monthly_bill = float(body.get("monthly_bill", 175))
+        utility_rate = float(body.get("utility_rate", 0.14))
+        stage        = body.get("stage", "new")
+        contact_name = body.get("contact_name", "")
+        email_addr   = body.get("email", "")
+        rep_name     = body.get("rep_name", "Your Solar Rep")
+        rep_phone    = body.get("rep_phone", "602-555-0100")
+        company      = body.get("company", "Elevate Solar")
+        pipeline_id  = body.get("pipeline_lead_id")
+        fmt          = body.get("format", "json")
+
+        valid_stages = ["new", "contacted", "qualified", "proposed"]
+
+        # Load from pipeline if ID provided
+        if pipeline_id:
+            try:
+                from scripts.pipeline import PipelineCRM
+                db = PipelineCRM()
+                rec = db.get_lead(int(pipeline_id))
+                if rec:
+                    address = address or rec.get("address", "")
+                    contact_name = contact_name or rec.get("contact_name", "")
+                    email_addr = email_addr or rec.get("email", "")
+                    monthly_bill = monthly_bill if body.get("monthly_bill") else rec.get("monthly_bill", monthly_bill)
+                    stage = stage if body.get("stage") else rec.get("stage", stage)
+            except Exception:
+                pass
+
+        if stage not in valid_stages:
+            stage = "new"
+
+        lead = {}
+        if address:
+            try:
+                lead = enrich_lead(address, monthly_bill, utility_rate)
+                if lead.get("error"):
+                    lead = {"address": address}
+            except Exception:
+                lead = {"address": address}
+
+        campaign = generate_drip_campaign(
+            lead, stage=stage, monthly_bill=monthly_bill,
+            rep_name=rep_name, rep_phone=rep_phone,
+            company=company, contact_name=contact_name, email=email_addr
+        )
+
+        if fmt == "csv":
+            csv_text = export_csv(campaign)
+            from fastapi.responses import PlainTextResponse
+            return PlainTextResponse(csv_text, media_type="text/csv",
+                headers={"Content-Disposition": f'attachment; filename="drip_{stage}.csv"'})
+
+        campaign.pop("csv_rows", None)
+        return JSONResponse(campaign)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"Drip campaign error: {e}")
+
+
+@app.get("/api/lead/drip-campaign/stages",
+    summary="List available drip campaign stages",
+    tags=["Lead Intelligence"])
+async def drip_stages():
+    """Returns available pipeline stages and message counts per stage."""
+    try:
+        from scripts.drip_campaign import CAMPAIGNS, STAGE_INTRO
+        stages = []
+        for stage, steps in CAMPAIGNS.items():
+            sms_count = sum(1 for s in steps if s["channel"] == "sms")
+            email_count = sum(1 for s in steps if s["channel"] == "email")
+            total_days = max(s["day"] for s in steps) if steps else 0
+            stages.append({
+                "stage": stage,
+                "label": STAGE_INTRO.get(stage, stage),
+                "message_count": len(steps),
+                "sms_count": sms_count,
+                "email_count": email_count,
+                "total_days": total_days,
+            })
+        return JSONResponse({"stages": stages, "total": len(stages)})
+    except Exception as e:
+        raise HTTPException(500, f"Error: {e}")
+
+
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8765)

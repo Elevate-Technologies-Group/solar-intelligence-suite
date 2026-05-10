@@ -164,6 +164,7 @@
     <div class="tab" onclick="switchTab('report-card')">📋 Report Card</div>
     <div class="tab" onclick="switchTab('widget')">🌐 Website Widget</div>
     <div class="tab" onclick="switchTab('appt-setter')">📞 Appt Setter</div>
+    <div class="tab" onclick="switchTab('drip-campaign')">💧 Drip Campaign</div>
     <div class="tab" onclick="switchTab('about')">📖 How It Works</div>
   </div>
 
@@ -1470,6 +1471,96 @@
     </div>
   </div>
 
+  <div id="tab-drip-campaign" class="panel">
+    <div class="card">
+      <div class="card-title"><span>💧</span> 90-Day Lead Nurture Drip Campaign Generator</div>
+      <p style="color:#94a3b8;margin:0 0 16px">Generate a complete personalized email + SMS sequence for any pipeline stage. All messages are injected with real Google Solar satellite data — savings, ITC, payback, system size — so every touchpoint feels custom-built for that homeowner.</p>
+
+      <div class="grid-2" style="gap:12px;margin-bottom:16px">
+        <div>
+          <label style="color:#94a3b8;font-size:12px;display:block;margin-bottom:4px">HOME ADDRESS (optional — enriches with real satellite data)</label>
+          <input id="drip-address" type="text" placeholder="1905 E Marquette Dr, Gilbert AZ 85234" style="width:100%;padding:10px;background:#1e293b;border:1px solid #334155;border-radius:6px;color:#f1f5f9;box-sizing:border-box">
+        </div>
+        <div>
+          <label style="color:#94a3b8;font-size:12px;display:block;margin-bottom:4px">MONTHLY ELECTRIC BILL</label>
+          <input id="drip-bill" type="number" value="175" min="50" max="1000" style="width:100%;padding:10px;background:#1e293b;border:1px solid #334155;border-radius:6px;color:#f1f5f9;box-sizing:border-box">
+        </div>
+        <div>
+          <label style="color:#94a3b8;font-size:12px;display:block;margin-bottom:4px">PIPELINE STAGE</label>
+          <select id="drip-stage" style="width:100%;padding:10px;background:#1e293b;border:1px solid #334155;border-radius:6px;color:#f1f5f9;box-sizing:border-box">
+            <option value="new">🆕 New Lead — First-Touch Nurture (30 days)</option>
+            <option value="contacted">📞 Contacted — Post-Conversation Follow-Up (21 days)</option>
+            <option value="qualified">✅ Qualified — Pre-Proposal Warm-Up (14 days)</option>
+            <option value="proposed">📄 Proposed — Decision Sequence (21 days)</option>
+          </select>
+        </div>
+        <div>
+          <label style="color:#94a3b8;font-size:12px;display:block;margin-bottom:4px">CONTACT NAME</label>
+          <input id="drip-contact" type="text" placeholder="Sarah Martinez" style="width:100%;padding:10px;background:#1e293b;border:1px solid #334155;border-radius:6px;color:#f1f5f9;box-sizing:border-box">
+        </div>
+        <div>
+          <label style="color:#94a3b8;font-size:12px;display:block;margin-bottom:4px">REP NAME</label>
+          <input id="drip-rep-name" type="text" placeholder="Jake Rivera" style="width:100%;padding:10px;background:#1e293b;border:1px solid #334155;border-radius:6px;color:#f1f5f9;box-sizing:border-box">
+        </div>
+        <div>
+          <label style="color:#94a3b8;font-size:12px;display:block;margin-bottom:4px">REP PHONE</label>
+          <input id="drip-rep-phone" type="text" placeholder="602-555-0100" style="width:100%;padding:10px;background:#1e293b;border:1px solid #334155;border-radius:6px;color:#f1f5f9;box-sizing:border-box">
+        </div>
+        <div>
+          <label style="color:#94a3b8;font-size:12px;display:block;margin-bottom:4px">COMPANY</label>
+          <input id="drip-company" type="text" placeholder="Elevate Solar" style="width:100%;padding:10px;background:#1e293b;border:1px solid #334155;border-radius:6px;color:#f1f5f9;box-sizing:border-box">
+        </div>
+        <div style="display:flex;align-items:flex-end;gap:8px">
+          <button onclick="loadDripCampaign()" style="flex:1;padding:10px;background:linear-gradient(135deg,#0ea5e9,#6366f1);border:none;border-radius:6px;color:#fff;font-weight:600;cursor:pointer;font-size:14px">💧 Generate Campaign</button>
+          <button onclick="downloadDripCSV()" style="padding:10px 16px;background:#1e293b;border:1px solid #334155;border-radius:6px;color:#94a3b8;cursor:pointer;font-size:13px" title="Download GHL-ready CSV">📥 CSV</button>
+        </div>
+      </div>
+
+      <div id="drip-stats" style="display:none;background:#0f172a;border-radius:8px;padding:14px;margin-bottom:16px">
+        <div style="display:flex;gap:20px;flex-wrap:wrap">
+          <div><span style="color:#94a3b8;font-size:11px">STAGE</span><br><span id="drip-stat-stage" style="color:#38bdf8;font-weight:700;font-size:16px">—</span></div>
+          <div><span style="color:#94a3b8;font-size:11px">MESSAGES</span><br><span id="drip-stat-count" style="color:#f1f5f9;font-weight:700;font-size:16px">—</span></div>
+          <div><span style="color:#94a3b8;font-size:11px">DURATION</span><br><span id="drip-stat-days" style="color:#f1f5f9;font-weight:700;font-size:16px">—</span></div>
+          <div><span style="color:#94a3b8;font-size:11px">LEAD SCORE</span><br><span id="drip-stat-score" style="color:#22c55e;font-weight:700;font-size:16px">—</span></div>
+          <div><span style="color:#94a3b8;font-size:11px">YR-1 SAVINGS</span><br><span id="drip-stat-savings" style="color:#22c55e;font-weight:700;font-size:16px">—</span></div>
+        </div>
+      </div>
+
+      <div id="drip-messages" style="display:none"></div>
+
+      <div id="drip-loading" style="display:none;text-align:center;padding:40px;color:#94a3b8">
+        <div style="font-size:32px;margin-bottom:8px">💧</div>
+        Generating personalized drip campaign...
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <div class="card-title"><span>📋</span> Stage Strategy Guide</div>
+      <div class="grid-2" style="gap:12px;margin-top:8px">
+        <div style="background:#0f172a;border-radius:8px;padding:14px;border-left:3px solid #38bdf8">
+          <div style="font-weight:700;color:#38bdf8;margin-bottom:6px">🆕 NEW — First Touch (9 msgs, 30 days)</div>
+          <div style="color:#94a3b8;font-size:13px">Immediate response → data hook email → ITC urgency → social proof → cost of waiting → appointment ask → soft break-up. Strike while the iron is hot.</div>
+        </div>
+        <div style="background:#0f172a;border-radius:8px;padding:14px;border-left:3px solid #a78bfa">
+          <div style="font-weight:700;color:#a78bfa;margin-bottom:6px">📞 CONTACTED — Post-Call (8 msgs, 21 days)</div>
+          <div style="color:#94a3b8;font-size:13px">Data recap → full email summary → appointment ask → financing options → ITC window → thinking-about-it math → referral angle → final value summary.</div>
+        </div>
+        <div style="background:#0f172a;border-radius:8px;padding:14px;border-left:3px solid #22c55e">
+          <div style="font-weight:700;color:#22c55e;margin-bottom:6px">✅ QUALIFIED — Pre-Proposal (7 msgs, 14 days)</div>
+          <div style="color:#94a3b8;font-size:13px">Excitement → process overview → system teaser → full savings preview → ITC reminder → neighborhood social proof → proposal call scheduling.</div>
+        </div>
+        <div style="background:#0f172a;border-radius:8px;padding:14px;border-left:3px solid #f59e0b">
+          <div style="font-weight:700;color:#f59e0b;margin-bottom:6px">📄 PROPOSED — Decision Sequence (8 msgs, 21 days)</div>
+          <div style="color:#94a3b8;font-size:13px">Proposal confirmation → key numbers recap → question opener → ROI breakdown → ITC deadline → objection pre-emption → decision check-in → final call.</div>
+        </div>
+      </div>
+      <div style="margin-top:14px;padding:12px;background:#0f172a;border-radius:6px;color:#94a3b8;font-size:12px">
+        <strong style="color:#f1f5f9">📥 GHL Import:</strong> Click CSV to download a GHL-importable spreadsheet. Each row = one message with send date, channel, subject, body, and lead data. Import into your GHL workflow as a custom CSV trigger. |
+        <strong style="color:#f1f5f9">API:</strong> <code style="color:#38bdf8">GET /api/lead/drip-campaign?address=...&amp;stage=new&amp;format=csv</code>
+      </div>
+    </div>
+  </div>
+
   <div id="tab-about" class="panel">
     <div class="grid-2">
       <div class="card">
@@ -2032,6 +2123,10 @@ function renderLead(d) {
         <button onclick="openApptSetterForLead('${d.address}', ${d.monthly_bill_used||175})"
                 style="flex:1;min-width:140px;padding:10px;background:#1e293b;border:1px solid #22d3ee;color:#22d3ee;border-radius:8px;cursor:pointer;font-size:0.85rem;font-weight:600;">
           📞 Appt Setter
+        </button>
+        <button onclick="openDripForLead('${d.address}', ${d.monthly_bill_used||175}, 'new')"
+                style="flex:1;min-width:140px;padding:10px;background:#1e293b;border:1px solid #38bdf8;color:#38bdf8;border-radius:8px;cursor:pointer;font-size:0.85rem;font-weight:600;">
+          💧 Drip Campaign
         </button>
       </div>
       <div id="ghl-push-result" style="margin-top:10px;font-size:0.82rem;"></div>
@@ -3636,6 +3731,133 @@ function openApptSetterForLead(address, bill) {
   if (address) document.getElementById('as-address').value = address;
   if (bill) document.getElementById('as-bill').value = bill;
   setTimeout(loadApptSetter, 300);
+}
+
+// ── Drip Campaign tab ──────────────────────────────────────────────────────────
+let _dripLastCampaign = null;
+
+async function loadDripCampaign() {
+  const address  = document.getElementById('drip-address').value.trim();
+  const bill     = document.getElementById('drip-bill').value || 175;
+  const stage    = document.getElementById('drip-stage').value;
+  const contact  = document.getElementById('drip-contact').value.trim();
+  const repName  = document.getElementById('drip-rep-name').value.trim();
+  const repPhone = document.getElementById('drip-rep-phone').value.trim();
+  const company  = document.getElementById('drip-company').value.trim();
+
+  document.getElementById('drip-loading').style.display = 'block';
+  document.getElementById('drip-messages').style.display = 'none';
+  document.getElementById('drip-stats').style.display = 'none';
+
+  const params = new URLSearchParams({
+    monthly_bill: bill,
+    stage,
+    ...(address && { address }),
+    ...(contact && { contact_name: contact }),
+    ...(repName && { rep_name: repName }),
+    ...(repPhone && { rep_phone: repPhone }),
+    ...(company && { company }),
+  });
+
+  try {
+    const res = await fetch('/api/lead/drip-campaign?' + params.toString());
+    if (!res.ok) throw new Error(await res.text());
+    const data = await res.json();
+    _dripLastCampaign = data;
+
+    // Update stats bar
+    const stageLabels = {new:'🆕 New Lead', contacted:'📞 Contacted', qualified:'✅ Qualified', proposed:'📄 Proposed'};
+    document.getElementById('drip-stat-stage').textContent = stageLabels[data.stage] || data.stage;
+    document.getElementById('drip-stat-count').textContent = data.message_count + ' total (' + data.email_count + ' email, ' + data.sms_count + ' SMS)';
+    document.getElementById('drip-stat-days').textContent = data.total_days + ' days';
+    document.getElementById('drip-stat-score').textContent = (data.lead_score || '—') + '/100 ' + (data.grade || '');
+    document.getElementById('drip-stat-savings').textContent = data.context && data.context.savings_yr1 ? data.context.savings_yr1 + '/yr' : '—';
+    document.getElementById('drip-stats').style.display = 'block';
+
+    // Render messages
+    const container = document.getElementById('drip-messages');
+    container.innerHTML = '';
+
+    data.messages.forEach((msg, i) => {
+      const isSMS = msg.channel === 'sms';
+      const chColor = isSMS ? '#38bdf8' : '#818cf8';
+      const chIcon = isSMS ? '📱' : '📧';
+      const bodyHtml = msg.body.replace(/\n/g, '<br>');
+      const subjectHtml = msg.subject ? `<div style="color:#e2e8f0;font-size:13px;font-weight:600;margin-bottom:8px">📌 Subject: ${msg.subject}</div>` : '';
+
+      const div = document.createElement('div');
+      div.style.cssText = 'background:#0f172a;border-radius:8px;padding:16px;margin-bottom:12px;border-left:3px solid ' + chColor;
+      div.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <div>
+            <span style="font-weight:700;color:${chColor}">${chIcon} ${msg.channel.toUpperCase()} — Day ${msg.day}</span>
+            <span style="color:#64748b;font-size:12px;margin-left:10px">${msg.send_date}</span>
+          </div>
+          <div style="display:flex;gap:6px">
+            <span style="background:#1e293b;color:#94a3b8;font-size:11px;padding:3px 8px;border-radius:4px">${msg.goal}</span>
+            <button onclick="copyDripMsg(this)" data-body="${msg.body.replace(/"/g,'&quot;').replace(/\n/g,'\\n')}" style="padding:3px 10px;background:#1e293b;border:1px solid #334155;border-radius:4px;color:#94a3b8;cursor:pointer;font-size:11px">📋 Copy</button>
+          </div>
+        </div>
+        ${subjectHtml}
+        <div style="color:#cbd5e1;font-size:13px;line-height:1.6">${bodyHtml}</div>
+      `;
+      container.appendChild(div);
+    });
+
+    container.style.display = 'block';
+  } catch(e) {
+    alert('Error generating drip campaign: ' + e.message);
+  }
+  document.getElementById('drip-loading').style.display = 'none';
+}
+
+function copyDripMsg(btn) {
+  const body = btn.getAttribute('data-body').replace(/\\n/g, '\n');
+  navigator.clipboard.writeText(body).then(() => {
+    const orig = btn.textContent;
+    btn.textContent = '✅ Copied';
+    setTimeout(() => btn.textContent = orig, 1500);
+  });
+}
+
+async function downloadDripCSV() {
+  const address  = document.getElementById('drip-address').value.trim();
+  const bill     = document.getElementById('drip-bill').value || 175;
+  const stage    = document.getElementById('drip-stage').value;
+  const contact  = document.getElementById('drip-contact').value.trim();
+  const repName  = document.getElementById('drip-rep-name').value.trim();
+  const repPhone = document.getElementById('drip-rep-phone').value.trim();
+  const company  = document.getElementById('drip-company').value.trim();
+
+  const params = new URLSearchParams({
+    monthly_bill: bill, stage, format: 'csv',
+    ...(address && { address }),
+    ...(contact && { contact_name: contact }),
+    ...(repName && { rep_name: repName }),
+    ...(repPhone && { rep_phone: repPhone }),
+    ...(company && { company }),
+  });
+
+  try {
+    const res = await fetch('/api/lead/drip-campaign?' + params.toString());
+    if (!res.ok) throw new Error('CSV download failed');
+    const csv = await res.text();
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `drip_${stage}.csv`;
+    a.click();
+  } catch(e) {
+    alert('Error: ' + e.message);
+  }
+}
+
+function openDripForLead(address, bill, stage) {
+  switchTab('drip-campaign');
+  if (address) document.getElementById('drip-address').value = address;
+  if (bill) document.getElementById('drip-bill').value = bill;
+  if (stage) document.getElementById('drip-stage').value = stage;
+  setTimeout(loadDripCampaign, 200);
 }
 
 </script>
