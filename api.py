@@ -2086,5 +2086,123 @@ async def pipeline_import(max_leads: int = 20):
         raise HTTPException(500, f"Pipeline import error: {e}")
 
 
+
+# ─── Report Card Endpoints ────────────────────────────────────────────────────
+
+@app.get("/api/lead/report-card",
+    summary="Generate a homeowner solar report card (HTML)",
+    tags=["Lead Tools"])
+async def report_card_get(
+    address: str = Query(..., description="Property address"),
+    monthly_bill: float = Query(175.0, description="Monthly utility bill in USD"),
+    utility_rate: float = Query(0.14, description="Utility rate per kWh"),
+    rep_name: str = Query("", description="Rep's name for footer"),
+    rep_phone: str = Query("", description="Rep's phone for CTA"),
+    rep_company: str = Query("Solar Intelligence", description="Company name"),
+):
+    """
+    Generate a standalone, mobile-responsive homeowner solar report card.
+    Returns full HTML — suitable for texting/emailing the link to the homeowner.
+    """
+    try:
+        from scripts.report_card import generate_report_card
+        result = generate_report_card(
+            address,
+            monthly_bill=monthly_bill,
+            utility_rate=utility_rate,
+            rep_name=rep_name,
+            rep_phone=rep_phone,
+            rep_company=rep_company,
+        )
+        if result.get("error"):
+            raise HTTPException(400, result["error"])
+        from fastapi.responses import HTMLResponse
+        return HTMLResponse(content=result["html"], status_code=200)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"Report card error: {e}")
+
+
+@app.post("/api/lead/report-card",
+    summary="Generate a homeowner solar report card (POST)",
+    tags=["Lead Tools"])
+async def report_card_post(request: Request):
+    """
+    Generate a homeowner solar report card HTML page.
+    Body: {address, monthly_bill, utility_rate, rep_name, rep_phone, rep_company}
+    Returns standalone HTML.
+    """
+    try:
+        from scripts.report_card import generate_report_card
+        from fastapi.responses import HTMLResponse
+        body = await request.json()
+        address = body.get("address", "")
+        if not address:
+            raise HTTPException(400, "address is required")
+        result = generate_report_card(
+            address,
+            monthly_bill=float(body.get("monthly_bill", 175)),
+            utility_rate=float(body.get("utility_rate", 0.14)),
+            rep_name=body.get("rep_name", ""),
+            rep_phone=body.get("rep_phone", ""),
+            rep_company=body.get("rep_company", "Solar Intelligence"),
+        )
+        if result.get("error"):
+            raise HTTPException(400, result["error"])
+        return HTMLResponse(content=result["html"], status_code=200)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"Report card error: {e}")
+
+
+@app.get("/api/lead/report-card/json",
+    summary="Generate report card — return JSON summary instead of HTML",
+    tags=["Lead Tools"])
+async def report_card_json(
+    address: str = Query(..., description="Property address"),
+    monthly_bill: float = Query(175.0),
+    utility_rate: float = Query(0.14),
+    rep_name: str = Query(""),
+    rep_phone: str = Query(""),
+    rep_company: str = Query("Solar Intelligence"),
+):
+    """Returns JSON metadata (not HTML) for the generated report card."""
+    try:
+        from scripts.report_card import generate_report_card
+        result = generate_report_card(
+            address,
+            monthly_bill=monthly_bill,
+            utility_rate=utility_rate,
+            rep_name=rep_name,
+            rep_phone=rep_phone,
+            rep_company=rep_company,
+        )
+        if result.get("error"):
+            raise HTTPException(400, result["error"])
+        lead = result["lead"]
+        return JSONResponse({
+            "address": lead.get("address"),
+            "score": lead.get("lead_score"),
+            "grade": lead.get("lead_grade"),
+            "priority": lead.get("priority"),
+            "annual_savings_yr1": lead.get("annual_savings_yr1_usd"),
+            "net_cost_usd": lead.get("net_cost_usd"),
+            "payback_years": lead.get("payback_years"),
+            "roi_25yr_pct": lead.get("roi_25yr_pct"),
+            "system_kw": lead.get("system_size_kw"),
+            "panels": lead.get("panels_recommended"),
+            "sunshine_hours": lead.get("sunshine_hours_per_year"),
+            "saved_to": result["path"],
+            "rep_name": rep_name,
+            "rep_company": rep_company,
+        })
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"Report card JSON error: {e}")
+
+
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8765)

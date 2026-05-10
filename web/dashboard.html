@@ -161,6 +161,7 @@
     <div class="tab" onclick="switchTab('objections')">🗣️ Objection Handler</div>
     <div class="tab" onclick="switchTab('door-script')">🚪 Door-Knock Script</div>
     <div class="tab" onclick="switchTab('pipeline')" id="pipeline-tab">📊 Pipeline CRM</div>
+    <div class="tab" onclick="switchTab('report-card')">📋 Report Card</div>
     <div class="tab" onclick="switchTab('about')">📖 How It Works</div>
   </div>
 
@@ -1126,6 +1127,133 @@
     </div>
   </div>
 
+  <div id="tab-report-card" class="panel">
+    <div style="max-width:700px;margin:0 auto">
+      <div class="card" style="margin-bottom:1rem">
+        <div class="card-title"><span>📋</span> Homeowner Solar Report Card Generator</div>
+        <p style="color:var(--muted);font-size:13px;margin-bottom:1rem">
+          Generate a beautiful, mobile-responsive report card for any address.
+          Text or email this page to your prospect after the door knock — it's consumer-friendly
+          and includes their personalized solar numbers, ROI, and next steps.
+        </p>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+          <div style="grid-column:1/-1">
+            <label style="color:var(--muted);font-size:12px">Property Address</label>
+            <input id="rc-address" type="text" placeholder="1905 E Marquette Dr, Gilbert, AZ 85234"
+              style="width:100%;padding:10px;background:#0f172a;border:1px solid var(--border);border-radius:8px;color:var(--fg);font-size:14px;margin-top:4px"/>
+          </div>
+          <div>
+            <label style="color:var(--muted);font-size:12px">Monthly Bill ($)</label>
+            <input id="rc-bill" type="number" value="175" min="50" max="1000"
+              style="width:100%;padding:10px;background:#0f172a;border:1px solid var(--border);border-radius:8px;color:var(--fg);font-size:14px;margin-top:4px"/>
+          </div>
+          <div>
+            <label style="color:var(--muted);font-size:12px">Utility Rate ($/kWh)</label>
+            <input id="rc-rate" type="number" value="0.14" step="0.01" min="0.05" max="0.50"
+              style="width:100%;padding:10px;background:#0f172a;border:1px solid var(--border);border-radius:8px;color:var(--fg);font-size:14px;margin-top:4px"/>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px">
+          <div>
+            <label style="color:var(--muted);font-size:12px">Rep Name (optional)</label>
+            <input id="rc-rep-name" type="text" placeholder="Jake Rivera"
+              style="width:100%;padding:10px;background:#0f172a;border:1px solid var(--border);border-radius:8px;color:var(--fg);font-size:13px;margin-top:4px"/>
+          </div>
+          <div>
+            <label style="color:var(--muted);font-size:12px">Rep Phone (optional)</label>
+            <input id="rc-rep-phone" type="text" placeholder="602-555-0100"
+              style="width:100%;padding:10px;background:#0f172a;border:1px solid var(--border);border-radius:8px;color:var(--fg);font-size:13px;margin-top:4px"/>
+          </div>
+          <div>
+            <label style="color:var(--muted);font-size:12px">Company (optional)</label>
+            <input id="rc-rep-company" type="text" placeholder="Elevate Solar"
+              style="width:100%;padding:10px;background:#0f172a;border:1px solid var(--border);border-radius:8px;color:var(--fg);font-size:13px;margin-top:4px"/>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button onclick="loadReportCard()" style="padding:10px 28px;background:linear-gradient(135deg,#22c55e,#16a34a);border:none;border-radius:8px;color:#fff;font-weight:700;cursor:pointer;font-size:14px">
+            📋 Generate Report Card
+          </button>
+          <button onclick="openReportCardTab()" style="padding:10px 18px;background:#1e293b;border:1px solid var(--border);border-radius:8px;color:var(--fg);font-weight:600;cursor:pointer;font-size:13px">
+            🔗 Open in New Tab
+          </button>
+        </div>
+
+        <div id="rc-status" style="margin-top:10px;font-size:13px;display:none"></div>
+      </div>
+
+      <!-- Preview frame -->
+      <div id="rc-preview-wrap" style="display:none">
+        <div class="card" style="margin-bottom:1rem">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+            <div class="card-title" style="margin:0"><span>👁️</span> Live Preview</div>
+            <div style="display:flex;gap:8px">
+              <button id="rc-open-btn" onclick="openReportCardTab()"
+                style="padding:6px 14px;background:#0891b2;border:none;border-radius:6px;color:#fff;font-weight:600;cursor:pointer;font-size:12px">
+                🔗 Open Full Page
+              </button>
+              <button id="rc-download-btn" onclick="downloadReportCard()"
+                style="padding:6px 14px;background:#16a34a;border:none;border-radius:6px;color:#fff;font-weight:600;cursor:pointer;font-size:12px">
+                ⬇️ Download HTML
+              </button>
+            </div>
+          </div>
+          <div id="rc-meta" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px"></div>
+          <iframe id="rc-frame" style="width:100%;height:600px;border:1px solid var(--border);border-radius:8px;background:#0f172a" srcdoc=""></iframe>
+        </div>
+      </div>
+
+      <!-- How to use -->
+      <div class="card" style="margin-bottom:1rem">
+        <div class="card-title"><span>💡</span> How to Use This Tool</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px">
+          <div style="background:#0f172a;border-radius:8px;padding:12px">
+            <div style="font-weight:700;font-size:13px;margin-bottom:6px;color:var(--green)">After the Door Knock</div>
+            <div style="font-size:12px;color:var(--muted);line-height:1.5">
+              Generate the card for the homeowner's address → open full page → copy the URL →
+              text it to them: "Here's your personalized solar report I mentioned 📋"
+            </div>
+          </div>
+          <div style="background:#0f172a;border-radius:8px;padding:12px">
+            <div style="font-weight:700;font-size:13px;margin-bottom:6px;color:var(--accent)">Before the Appointment</div>
+            <div style="font-size:12px;color:var(--muted);line-height:1.5">
+              Send the card as a follow-up before your sit-down. They'll have already seen
+              the numbers — walk in with a warm, educated prospect.
+            </div>
+          </div>
+          <div style="background:#0f172a;border-radius:8px;padding:12px">
+            <div style="font-weight:700;font-size:13px;margin-bottom:6px;color:var(--yellow)">Add Your Branding</div>
+            <div style="font-size:12px;color:var(--muted);line-height:1.5">
+              Fill in Rep Name, Phone, and Company to add a branded footer card.
+              The call button turns your phone number into a tap-to-call link.
+            </div>
+          </div>
+          <div style="background:#0f172a;border-radius:8px;padding:12px">
+            <div style="font-weight:700;font-size:13px;margin-bottom:6px;color:#e879f9">Download for Offline</div>
+            <div style="font-size:12px;color:var(--muted);line-height:1.5">
+              Download the HTML file and share it as an attachment — works 100% offline,
+              no internet required for the homeowner to view it.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- API Reference -->
+      <div class="card">
+        <div class="card-title"><span>⚙️</span> API Reference</div>
+        <div style="background:#0f172a;border-radius:8px;padding:12px;font-family:monospace;font-size:12px;color:var(--muted)">
+          <p><span style="color:var(--green)">GET</span> <span style="color:var(--accent)">/api/lead/report-card?address=...&monthly_bill=175</span></p>
+          <p style="margin:6px 0 0 0"><span style="color:var(--green)">GET</span> <span style="color:var(--accent)">/api/lead/report-card?address=...&rep_name=Jake&rep_phone=602-555-0100</span></p>
+          <p style="margin:6px 0 0 0"><span style="color:#f97316">POST</span> <span style="color:var(--accent)">/api/lead/report-card</span> — body: {address, monthly_bill, rep_name, rep_phone, rep_company}</p>
+          <p style="margin:6px 0 0 0"><span style="color:var(--green)">GET</span> <span style="color:var(--accent)">/api/lead/report-card/json?address=...</span> — JSON summary</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div id="tab-about" class="panel">
     <div class="grid-2">
       <div class="card">
@@ -1679,6 +1807,10 @@ function renderLead(d) {
         <button onclick="openObjHandlerForLead('${d.address}', ${d.monthly_bill_used||175})"
                 style="flex:1;min-width:140px;padding:10px;background:#1e293b;border:1px solid #f59e0b;color:#f59e0b;border-radius:8px;cursor:pointer;font-size:0.85rem;font-weight:600;">
           🗣️ Objection Handler
+        </button>
+        <button onclick="openReportCardForLead('${d.address}', ${d.monthly_bill_used||175})"
+                style="flex:1;min-width:140px;padding:10px;background:#1e293b;border:1px solid #22c55e;color:#22c55e;border-radius:8px;cursor:pointer;font-size:0.85rem;font-weight:600;">
+          📋 Report Card
         </button>
       </div>
       <div id="ghl-push-result" style="margin-top:10px;font-size:0.82rem;"></div>
@@ -2953,6 +3085,107 @@ async function importCacheLeads() {
   document.getElementById('pl-add-status').innerHTML =
     `<span style="color:var(--green);">✓ Imported ${data.imported} leads from cache!</span>`;
   loadPipeline();
+}
+
+// ── Report Card ────────────────────────────────────────────────────────────────
+
+let _rcLastHtml = '';
+let _rcLastAddress = '';
+
+async function loadReportCard() {
+  const address = document.getElementById('rc-address').value.trim();
+  const bill    = document.getElementById('rc-bill').value || 175;
+  const rate    = document.getElementById('rc-rate').value || 0.14;
+  const repName = document.getElementById('rc-rep-name').value.trim();
+  const repPhone= document.getElementById('rc-rep-phone').value.trim();
+  const repCo   = document.getElementById('rc-rep-company').value.trim();
+
+  if (!address) {
+    document.getElementById('rc-status').style.display = 'block';
+    document.getElementById('rc-status').innerHTML = '<span style="color:var(--red)">⚠️ Enter an address first</span>';
+    return;
+  }
+
+  const status = document.getElementById('rc-status');
+  status.style.display = 'block';
+  status.innerHTML = '<span style="color:var(--muted)">⏳ Generating report card...</span>';
+
+  try {
+    const params = new URLSearchParams({
+      address, monthly_bill: bill, utility_rate: rate,
+      rep_name: repName, rep_phone: repPhone, rep_company: repCo || 'Solar Intelligence'
+    });
+    const res = await fetch(`/api/lead/report-card?${params}`);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || res.statusText);
+    }
+    const html = await res.text();
+    _rcLastHtml = html;
+    _rcLastAddress = address;
+
+    // Show preview
+    document.getElementById('rc-frame').srcdoc = html;
+    document.getElementById('rc-preview-wrap').style.display = 'block';
+
+    // Load JSON meta for stat pills
+    const jRes = await fetch(`/api/lead/report-card/json?${params}`).catch(() => null);
+    if (jRes && jRes.ok) {
+      const d = await jRes.json();
+      document.getElementById('rc-meta').innerHTML = `
+        <span style="background:#1e293b;border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:12px">
+          Score: <strong style="color:#22c55e">${d.score}/100 ${d.grade}</strong>
+        </span>
+        <span style="background:#1e293b;border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:12px">
+          Yr1 Savings: <strong style="color:#38bdf8">$${(d.annual_savings_yr1||0).toLocaleString()}</strong>
+        </span>
+        <span style="background:#1e293b;border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:12px">
+          Net Cost: <strong>$${(d.net_cost_usd||0).toLocaleString()}</strong>
+        </span>
+        <span style="background:#1e293b;border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:12px">
+          Payback: <strong>${d.payback_years} yrs</strong>
+        </span>`;
+    }
+
+    status.innerHTML = '<span style="color:var(--green)">✅ Report card generated! Preview below.</span>';
+  } catch(e) {
+    status.innerHTML = `<span style="color:var(--red)">❌ Error: ${e.message}</span>`;
+  }
+}
+
+function openReportCardTab() {
+  const address = document.getElementById('rc-address').value.trim();
+  const bill    = document.getElementById('rc-bill').value || 175;
+  const rate    = document.getElementById('rc-rate').value || 0.14;
+  const repName = document.getElementById('rc-rep-name').value.trim();
+  const repPhone= document.getElementById('rc-rep-phone').value.trim();
+  const repCo   = document.getElementById('rc-rep-company').value.trim();
+  if (!address) { alert('Enter an address first'); return; }
+  const params = new URLSearchParams({
+    address, monthly_bill: bill, utility_rate: rate,
+    rep_name: repName, rep_phone: repPhone, rep_company: repCo || 'Solar Intelligence'
+  });
+  window.open(`/api/lead/report-card?${params}`, '_blank');
+}
+
+function downloadReportCard() {
+  if (!_rcLastHtml) { alert('Generate a report card first'); return; }
+  const slug = _rcLastAddress.replace(/[^a-z0-9]/gi, '_').substring(0, 30);
+  const blob = new Blob([_rcLastHtml], {type: 'text/html'});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = `solar_report_${slug}.html`;
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 500);
+}
+
+function openReportCardForLead(address, bill) {
+  switchTab('report-card');
+  setTimeout(() => {
+    document.getElementById('rc-address').value = address;
+    document.getElementById('rc-bill').value = bill || 175;
+    loadReportCard();
+  }, 200);
 }
 
 </script>
