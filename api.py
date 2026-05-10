@@ -9,7 +9,7 @@ sys.path.insert(0, "/root/solar-tools")
 
 from fastapi import FastAPI, HTTPException, Query, Body, Request
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
@@ -2202,6 +2202,255 @@ async def report_card_json(
         raise
     except Exception as e:
         raise HTTPException(500, f"Report card JSON error: {e}")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# WIDGET ENDPOINTS — Embeddable Solar Savings Calculator
+# ─────────────────────────────────────────────────────────────────────────────
+
+import sqlite3, datetime as _dt
+
+WIDGET_DB = "/root/solar-tools/cache/widget_leads.db"
+
+def _widget_db():
+    """Return a connection to the widget leads SQLite DB, creating table if needed."""
+    conn = sqlite3.connect(WIDGET_DB)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS widget_leads (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            submitted_at TEXT NOT NULL,
+            address TEXT,
+            name TEXT,
+            phone TEXT,
+            email TEXT,
+            monthly_bill REAL,
+            lead_score INTEGER,
+            lead_grade TEXT,
+            priority TEXT,
+            annual_savings REAL,
+            utm_source TEXT,
+            utm_campaign TEXT,
+            widget_company TEXT,
+            estimated INTEGER DEFAULT 0,
+            raw_json TEXT
+        )
+    """)
+    conn.commit()
+    return conn
+
+
+@app.get("/api/widget/embed.js",
+    summary="Serve the embeddable Solar widget JavaScript",
+    tags=["Widget"])
+async def widget_embed_js(request: Request):
+    """
+    Serves the standalone JavaScript widget. All query params are forwarded
+    to the widget config at runtime via the script src URL.
+
+    Usage:
+        <script src="http://localhost:8765/api/widget/embed.js?company=Elevate+Solar&primary=%2316a34a" async></script>
+    """
+    js_path = "/root/solar-tools/web/embed.js"
+    try:
+        js = open(js_path).read()
+    except FileNotFoundError:
+        raise HTTPException(404, "Widget JS not found. Build web/embed.js first.")
+    return Response(
+        content=js,
+        media_type="application/javascript",
+        headers={
+            "Cache-Control": "public, max-age=300",
+            "Access-Control-Allow-Origin": "*",
+        },
+    )
+
+
+@app.get("/api/widget/demo",
+    summary="Live demo page for the embeddable widget",
+    tags=["Widget"],
+    response_class=HTMLResponse)
+async def widget_demo():
+    """Returns the widget demo/documentation page."""
+    html_path = "/root/solar-tools/web/widget_demo.html"
+    try:
+        return HTMLResponse(open(html_path).read())
+    except FileNotFoundError:
+        raise HTTPException(404, "Demo page not found.")
+
+
+@app.get("/api/widget/snippet",
+    summary="Generate embed snippet for any config",
+    tags=["Widget"])
+async def widget_snippet(
+    company:     str = Query("Solar Intelligence", description="Company name"),
+    tagline:     str = Query("Find out how much you could save"),
+    primary:     str = Query("#16a34a", description="Accent color hex"),
+    mode:        str = Query("floating", description="floating | inline | button"),
+    target:      str = Query("", description="CSS selector (inline mode only)"),
+    phone:       str = Query("", description="Rep phone for thank-you screen"),
+    rep:         str = Query("", description="Rep name for thank-you screen"),
+    utm_source:  str = Query("website"),
+    utm_campaign:str = Query(""),
+    server_url:  str = Query("http://localhost:8765", description="Base URL of this server"),
+):
+    """Returns embed snippet code for copy-paste into any website."""
+    import urllib.parse
+    params = {
+        "company": company,
+        "tagline": tagline,
+        "primary": primary.replace("#", "%23"),
+        "mode": mode,
+    }
+    if target:      params["target"]       = target
+    if phone:       params["phone"]        = phone
+    if rep:         params["rep"]          = rep
+    if utm_source:  params["utm_source"]   = utm_source
+    if utm_campaign:params["utm_campaign"] = utm_campaign
+
+    qs = "&".join(f"{k}={urllib.parse.quote(str(v), safe='%')}" for k, v in params.items())
+    src = f"{server_url}/api/widget/embed.js?{qs}"
+    snippet = f'<!-- Solar Savings Calculator Widget by {company} -->\n<script src="{src}" async></script>'
+
+    return JSONResponse({
+        "snippet": snippet,
+        "src": src,
+        "config": params,
+        "demo_url": f"{server_url}/api/widget/demo",
+        "leads_url": f"{server_url}/api/widget/leads",
+    })
+
+
+class WidgetLeadRequest(BaseModel):
+    address: str = ""
+    name: str = ""
+    phone: str = ""
+    email: str = ""
+    monthly_bill: float = 175.0
+    lead_score: Optional[int] = None
+    lead_grade: Optional[str] = None
+    priority: Optional[str] = None
+    annual_savings: Optional[float] = None
+    utm_source: str = "embed_widget"
+    utm_campaign: str = ""
+    widget_company: str = ""
+    estimated: bool = False
+
+
+@app.post("/api/widget/submit",
+    summary="Receive lead from embedded widget",
+    tags=["Widget"])
+async def widget_submit(req: WidgetLeadRequest):
+    """
+    Called by the embedded widget when a homeowner submits their contact info.
+    Saves to widget_leads SQLite DB + fires Discord notification if configured.
+
+    Fields saved: address, name, phone, email, bill, score, grade, priority,
+                  annual_savings, UTM params, widget_company, estimated flag.
+    """
+    now = _dt.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+    raw = req.model_dump()
+
+    try:
+        conn = _widget_db()
+        conn.execute("""
+            INSERT INTO widget_leads
+              (submitted_at, address, name, phone, email, monthly_bill,
+               lead_score, lead_grade, priority, annual_savings,
+               utm_source, utm_campaign, widget_company, estimated, raw_json)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        """, (
+            now,
+            req.address, req.name, req.phone, req.email,
+            req.monthly_bill, req.lead_score, req.lead_grade,
+            req.priority, req.annual_savings,
+            req.utm_source, req.utm_campaign, req.widget_company,
+            1 if req.estimated else 0,
+            json.dumps(raw),
+        ))
+        conn.commit()
+        lead_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+        conn.close()
+    except Exception as e:
+        lead_id = None
+        # Don't crash widget — log and continue
+        print(f"[Widget] DB error: {e}")
+
+    # Discord notification for HOT/WARM priority captures
+    if _discord_enabled and req.priority in ("HOT", "WARM"):
+        try:
+            from integrations.discord_alerts import post_message
+            score_str = f"{req.lead_score}/100" if req.lead_score else "~72/100"
+            savings_str = f"${req.annual_savings:,.0f}/yr" if req.annual_savings else "TBD"
+            msg = (
+                f"🌐 **New Widget Lead — {req.priority}!**\n"
+                f"**Name:** {req.name}  |  **Phone:** {req.phone}"
+                + (f"  |  **Email:** {req.email}" if req.email else "") + "\n"
+                f"**Address:** {req.address}\n"
+                f"**Score:** {score_str}  |  **Est. savings:** {savings_str}\n"
+                f"**Source:** {req.utm_source}"
+                + (f"  |  **Campaign:** {req.utm_campaign}" if req.utm_campaign else "")
+                + (f"\n*Estimated (API fallback mode)*" if req.estimated else "")
+            )
+            post_message(msg)
+        except Exception:
+            pass
+
+    return JSONResponse({
+        "ok": True,
+        "lead_id": lead_id,
+        "message": f"Lead captured — thank you, {req.name.split()[0] if req.name else 'there'}!",
+        "address": req.address,
+        "priority": req.priority,
+    })
+
+
+@app.get("/api/widget/leads",
+    summary="List all widget-captured leads",
+    tags=["Widget"])
+async def widget_leads(
+    limit: int = Query(100, ge=1, le=500),
+    priority: str = Query("", description="Filter by priority: HOT, WARM, COOL"),
+    since_hours: int = Query(0, description="Only return leads from last N hours (0=all)"),
+):
+    """
+    Returns all leads captured via the embeddable widget, sorted newest first.
+    Useful for reviewing overnight widget submissions in the dashboard.
+    """
+    try:
+        conn = _widget_db()
+        sql = "SELECT * FROM widget_leads WHERE 1=1"
+        params = []
+        if priority:
+            sql += " AND priority = ?"
+            params.append(priority.upper())
+        if since_hours:
+            cutoff = (_dt.datetime.utcnow() - _dt.timedelta(hours=since_hours)).strftime("%Y-%m-%d %H:%M:%S")
+            sql += " AND submitted_at >= ?"
+            params.append(cutoff)
+        sql += " ORDER BY submitted_at DESC LIMIT ?"
+        params.append(limit)
+
+        rows = conn.execute(sql, params).fetchall()
+        cols = [d[0] for d in conn.execute("SELECT * FROM widget_leads LIMIT 0").description]
+        conn.close()
+
+        leads_out = []
+        for row in rows:
+            d = dict(zip(cols, row))
+            d.pop("raw_json", None)  # omit raw blob
+            leads_out.append(d)
+
+        hot_count  = sum(1 for r in leads_out if r.get("priority") == "HOT")
+        warm_count = sum(1 for r in leads_out if r.get("priority") == "WARM")
+
+        return JSONResponse({
+            "total": len(leads_out),
+            "hot_leads": hot_count,
+            "warm_leads": warm_count,
+            "leads": leads_out,
+        })
+    except Exception as e:
+        raise HTTPException(500, f"Widget leads error: {e}")
 
 
 if __name__ == "__main__":

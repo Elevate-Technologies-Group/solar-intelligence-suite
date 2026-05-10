@@ -162,6 +162,7 @@
     <div class="tab" onclick="switchTab('door-script')">🚪 Door-Knock Script</div>
     <div class="tab" onclick="switchTab('pipeline')" id="pipeline-tab">📊 Pipeline CRM</div>
     <div class="tab" onclick="switchTab('report-card')">📋 Report Card</div>
+    <div class="tab" onclick="switchTab('widget')">🌐 Website Widget</div>
     <div class="tab" onclick="switchTab('about')">📖 How It Works</div>
   </div>
 
@@ -1254,6 +1255,118 @@
     </div>
   </div>
 
+  <div id="tab-widget" class="panel">
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title"><span>🌐</span> Website Widget — Embed Solar Calculator</div>
+        <p style="font-size:13px;color:var(--muted);margin-bottom:16px">Drop one script tag on any website to add a Solar Savings Calculator. Homeowners enter their address, see personalized savings, and submit their contact info — leads flow straight to your pipeline.</p>
+
+        <label class="form-label">Company Name</label>
+        <input type="text" class="form-input" id="w-company" value="Elevate Solar" placeholder="Your company">
+
+        <label class="form-label">Tagline</label>
+        <input type="text" class="form-input" id="w-tagline" value="Find out how much you could save">
+
+        <label class="form-label">Rep Name (shown after lead submits)</label>
+        <input type="text" class="form-input" id="w-rep" placeholder="Jake Rivera">
+
+        <label class="form-label">Rep Phone</label>
+        <input type="text" class="form-input" id="w-phone" placeholder="602-555-0100">
+
+        <label class="form-label">Accent Color</label>
+        <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px">
+          <input type="color" id="w-color" value="#16a34a" style="width:48px;height:36px;border-radius:8px;border:1px solid var(--border);background:var(--surface);cursor:pointer">
+          <input type="text" class="form-input" id="w-color-hex" value="#16a34a" style="width:120px;margin:0" placeholder="#16a34a">
+        </div>
+
+        <label class="form-label">Embed Mode</label>
+        <select class="form-input" id="w-mode">
+          <option value="floating">Floating (fixed corner button)</option>
+          <option value="inline">Inline (inside a container div)</option>
+          <option value="button">Button (trigger via SolarWidget.open())</option>
+        </select>
+
+        <div id="w-target-row" style="display:none">
+          <label class="form-label">Target CSS Selector</label>
+          <input type="text" class="form-input" id="w-target" placeholder="#solar-calculator">
+        </div>
+
+        <label class="form-label">UTM Source</label>
+        <input type="text" class="form-input" id="w-utm" value="website" placeholder="website">
+
+        <button class="btn btn-primary" onclick="generateWidgetSnippet()" style="margin-top:4px">⚙️ Generate Snippet</button>
+      </div>
+
+      <div class="card">
+        <div class="card-title"><span>📋</span> Your Embed Code</div>
+        <div id="w-snippet-result" style="font-size:13px;color:var(--muted)">
+          <p>Configure the widget on the left and click <strong>Generate Snippet</strong> to get your embed code.</p>
+        </div>
+
+        <div id="w-snippet-code" style="display:none">
+          <pre id="w-code-block" style="background:#0f172a;border:1px solid var(--border);border-radius:8px;padding:16px;font-size:12px;color:#7dd3fc;overflow-x:auto;white-space:pre-wrap;word-break:break-all"></pre>
+          <div style="display:flex;gap:8px;margin-top:10px">
+            <button class="btn btn-primary" onclick="copyWidgetSnippet()" style="flex:1">📋 Copy Code</button>
+            <a id="w-demo-link" href="/api/widget/demo" target="_blank" class="btn" style="flex:1;text-align:center;text-decoration:none">🔗 Open Demo Page</a>
+          </div>
+        </div>
+
+        <div style="margin-top:24px">
+          <div class="card-title" style="font-size:14px;border-top:1px solid var(--border);padding-top:16px;margin-top:16px"><span>🎛️</span> Embed Modes</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:10px">
+            <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center">
+              <div style="font-size:18px;margin-bottom:4px">🟢</div>
+              <div style="font-size:12px;font-weight:700;color:var(--fg)">Floating</div>
+              <div style="font-size:11px;color:var(--muted);margin-top:2px">Fixed button in corner, modal popup</div>
+            </div>
+            <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center">
+              <div style="font-size:18px;margin-bottom:4px">📦</div>
+              <div style="font-size:12px;font-weight:700;color:var(--fg)">Inline</div>
+              <div style="font-size:11px;color:var(--muted);margin-top:2px">Mounts inside any container</div>
+            </div>
+            <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center">
+              <div style="font-size:18px;margin-bottom:4px">🔘</div>
+              <div style="font-size:12px;font-weight:700;color:var(--fg)">Button</div>
+              <div style="font-size:11px;color:var(--muted);margin-top:2px">SolarWidget.open() trigger</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <div class="card-title"><span>📥</span> Widget-Captured Leads
+        <span id="w-leads-badge" style="background:var(--green);color:#fff;border-radius:99px;padding:2px 10px;font-size:12px;font-weight:700;margin-left:10px"></span>
+        <button class="btn" onclick="loadWidgetLeads()" style="margin-left:auto;padding:4px 12px;font-size:12px">🔄 Refresh</button>
+      </div>
+      <div id="w-leads-table" style="font-size:13px;color:var(--muted)">
+        <p>Click <strong>Refresh</strong> to load leads submitted through the website widget.</p>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <div class="card-title"><span>💡</span> How to Use</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;font-size:13px">
+        <div style="background:var(--surface);border-radius:8px;padding:14px">
+          <strong style="color:var(--green)">1. Generate your snippet</strong>
+          <p style="color:var(--muted);margin-top:6px">Set your company name, colors, and rep info. Click Generate Snippet.</p>
+        </div>
+        <div style="background:var(--surface);border-radius:8px;padding:14px">
+          <strong style="color:var(--green)">2. Drop on your website</strong>
+          <p style="color:var(--muted);margin-top:6px">Paste the one-line script tag into your website's HTML, just before &lt;/body&gt;.</p>
+        </div>
+        <div style="background:var(--surface);border-radius:8px;padding:14px">
+          <strong style="color:var(--green)">3. Homeowners self-qualify</strong>
+          <p style="color:var(--muted);margin-top:6px">Visitors enter their address → see real satellite data and savings estimate instantly.</p>
+        </div>
+        <div style="background:var(--surface);border-radius:8px;padding:14px">
+          <strong style="color:var(--green)">4. Leads flow to pipeline</strong>
+          <p style="color:var(--muted);margin-top:6px">Every submission is saved here, scored, and optionally sent to Discord for instant rep notification.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div id="tab-about" class="panel">
     <div class="grid-2">
       <div class="card">
@@ -1452,6 +1565,7 @@ function switchTab(name) {
   if (name === 'territory-report') loadCachedTerritoryList();
   if (name === 'lead-map') loadLeadMapStats();
   if (name === 'objections') loadObjList();
+  if (name === 'widget') loadWidgetLeads();
   if (name === 'canvass') {
     // pre-fill with a Gilbert example if empty
     const ca = document.getElementById('canvass-address');
@@ -3186,6 +3300,107 @@ function openReportCardForLead(address, bill) {
     document.getElementById('rc-bill').value = bill || 175;
     loadReportCard();
   }, 200);
+}
+
+// ── Website Widget tab ────────────────────────────────────────────────────────
+
+document.getElementById('w-mode').addEventListener('change', function() {
+  document.getElementById('w-target-row').style.display = this.value === 'inline' ? 'block' : 'none';
+});
+
+document.getElementById('w-color').addEventListener('input', function() {
+  document.getElementById('w-color-hex').value = this.value;
+});
+document.getElementById('w-color-hex').addEventListener('input', function() {
+  const v = this.value;
+  if (/^#[0-9a-fA-F]{6}$/.test(v)) document.getElementById('w-color').value = v;
+});
+
+async function generateWidgetSnippet() {
+  const company  = document.getElementById('w-company').value.trim() || 'Solar Intelligence';
+  const tagline  = document.getElementById('w-tagline').value.trim();
+  const rep      = document.getElementById('w-rep').value.trim();
+  const phone    = document.getElementById('w-phone').value.trim();
+  const color    = document.getElementById('w-color-hex').value.trim() || '#16a34a';
+  const mode     = document.getElementById('w-mode').value;
+  const target   = document.getElementById('w-target').value.trim();
+  const utm      = document.getElementById('w-utm').value.trim() || 'website';
+
+  const params = new URLSearchParams({
+    company, tagline,
+    primary: color,
+    mode,
+    utm_source: utm,
+    server_url: window.location.origin,
+  });
+  if (rep)    params.set('rep', rep);
+  if (phone)  params.set('phone', phone);
+  if (target) params.set('target', target);
+
+  try {
+    const r = await fetch(`${API}/api/widget/snippet?` + params.toString());
+    const d = await r.json();
+    document.getElementById('w-snippet-result').style.display = 'none';
+    document.getElementById('w-snippet-code').style.display = 'block';
+    document.getElementById('w-code-block').textContent = d.snippet;
+    document.getElementById('w-demo-link').href = d.demo_url;
+  } catch(e) {
+    alert('Error generating snippet: ' + e.message);
+  }
+}
+
+function copyWidgetSnippet() {
+  const text = document.getElementById('w-code-block').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = event.target;
+    btn.textContent = '✅ Copied!';
+    setTimeout(() => { btn.textContent = '📋 Copy Code'; }, 2000);
+  });
+}
+
+async function loadWidgetLeads() {
+  const el = document.getElementById('w-leads-table');
+  const badge = document.getElementById('w-leads-badge');
+  el.innerHTML = '<p style="color:var(--muted)">Loading widget leads…</p>';
+  try {
+    const r = await fetch(`${API}/api/widget/leads?limit=50`);
+    const d = await r.json();
+    badge.textContent = d.total ? `${d.hot_leads} HOT · ${d.warm_leads} WARM · ${d.total} total` : '';
+    if (!d.leads || !d.leads.length) {
+      el.innerHTML = '<p style="color:var(--muted)">No widget leads yet. Embed the widget on a website to start capturing leads.</p>';
+      return;
+    }
+    el.innerHTML = `
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:12px">
+          <thead><tr style="color:var(--muted);border-bottom:1px solid var(--border)">
+            <th style="padding:6px 10px;text-align:left">Submitted</th>
+            <th style="padding:6px 10px;text-align:left">Name</th>
+            <th style="padding:6px 10px;text-align:left">Phone</th>
+            <th style="padding:6px 10px;text-align:left">Address</th>
+            <th style="padding:6px 10px;text-align:left">Score</th>
+            <th style="padding:6px 10px;text-align:left">Savings</th>
+            <th style="padding:6px 10px;text-align:left">Source</th>
+          </tr></thead>
+          <tbody>
+            ${d.leads.map(l => {
+              const priorityColor = l.priority === 'HOT' ? 'var(--red)' : l.priority === 'WARM' ? '#f97316' : 'var(--muted)';
+              return `<tr style="border-bottom:1px solid var(--border)">
+                <td style="padding:6px 10px;color:var(--muted)">${l.submitted_at.substring(0, 16)}</td>
+                <td style="padding:6px 10px;font-weight:700">${l.name || '—'}</td>
+                <td style="padding:6px 10px"><a href="tel:${l.phone}" style="color:var(--accent);text-decoration:none">${l.phone || '—'}</a></td>
+                <td style="padding:6px 10px;color:var(--muted);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${l.address || '—'}</td>
+                <td style="padding:6px 10px"><span style="color:${priorityColor};font-weight:700">${l.lead_grade || '—'} ${l.lead_score ? l.lead_score+'/100' : ''}</span></td>
+                <td style="padding:6px 10px;color:var(--green)">${l.annual_savings ? '$'+Math.round(l.annual_savings).toLocaleString()+'/yr' : '—'}</td>
+                <td style="padding:6px 10px;color:var(--muted)">${l.utm_source || '—'}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>`;
+  } catch(e) {
+    el.innerHTML = `<p style="color:var(--red)">Error loading leads: ${e.message}</p>`;
+  }
 }
 
 </script>

@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Solar Intelligence Widget Demo</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0f172a;
+      color: #f1f5f9;
+      min-height: 100vh;
+    }
+    .hero {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 60px 24px 80px;
+    }
+    .badge {
+      display: inline-block;
+      background: #16a34a22;
+      color: #4ade80;
+      border: 1px solid #4ade8044;
+      border-radius: 99px;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 4px 14px;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      margin-bottom: 20px;
+    }
+    h1 { font-size: clamp(28px, 5vw, 52px); font-weight: 800; line-height: 1.1; margin-bottom: 16px; }
+    h1 span { color: #16a34a; }
+    .sub { font-size: 18px; color: #94a3b8; line-height: 1.6; margin-bottom: 48px; max-width: 640px; }
+    .section { margin-bottom: 56px; }
+    .section h2 { font-size: 22px; font-weight: 700; margin-bottom: 16px; padding-bottom: 10px; border-bottom: 1px solid #1e293b; }
+    .code-block {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 20px 24px;
+      font-family: 'Fira Code', 'Cascadia Code', monospace;
+      font-size: 14px;
+      color: #e2e8f0;
+      overflow-x: auto;
+      position: relative;
+    }
+    .code-block .tag { color: #fb923c; }
+    .code-block .attr { color: #7dd3fc; }
+    .code-block .val { color: #a3e635; }
+    .copy-btn {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      background: #334155;
+      color: #94a3b8;
+      border: none;
+      border-radius: 6px;
+      padding: 5px 12px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: background .15s;
+    }
+    .copy-btn:hover { background: #475569; color: #f1f5f9; }
+    .params-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 14px;
+    }
+    .param-card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      padding: 16px;
+    }
+    .param-name { font-family: monospace; color: #7dd3fc; font-size: 14px; font-weight: 700; margin-bottom: 4px; }
+    .param-default { font-size: 11px; color: #475569; margin-bottom: 6px; }
+    .param-desc { font-size: 13px; color: #94a3b8; }
+    .modes-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+    .mode-card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 20px;
+      text-align: center;
+    }
+    .mode-card .icon { font-size: 32px; margin-bottom: 10px; }
+    .mode-card h3 { font-size: 16px; font-weight: 700; margin-bottom: 6px; }
+    .mode-card p { font-size: 13px; color: #94a3b8; }
+    .api-section .endpoint {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      padding: 16px 20px;
+      margin-bottom: 10px;
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+    }
+    .method { font-family: monospace; font-size: 13px; font-weight: 700; border-radius: 5px; padding: 2px 8px; flex-shrink: 0; }
+    .method.get { background: #0d9488; color: #fff; }
+    .method.post { background: #7c3aed; color: #fff; }
+    .ep-path { font-family: monospace; font-size: 14px; color: #e2e8f0; }
+    .ep-desc { font-size: 13px; color: #94a3b8; margin-top: 3px; }
+    .demo-btn {
+      display: inline-block;
+      background: #16a34a;
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      padding: 14px 28px;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      text-decoration: none;
+      transition: filter .15s;
+    }
+    .demo-btn:hover { filter: brightness(1.12); }
+    .inline-demo {
+      border: 2px dashed #334155;
+      border-radius: 16px;
+      padding: 32px;
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .inline-demo p { color: #64748b; font-size: 14px; margin-bottom: 16px; }
+    @media (max-width: 600px) {
+      .modes-row { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<div class="hero">
+  <div class="badge">Embeddable Widget</div>
+  <h1>Solar Savings Calculator<br><span>Drop-in for any website</span></h1>
+  <p class="sub">One script tag. Any website. Homeowners enter their address and instantly see personalized solar savings — all leads flow straight into your pipeline.</p>
+
+  <div class="section">
+    <h2>⚡ Quickstart (Floating Button)</h2>
+    <div class="code-block" id="code-basic">
+<span class="tag">&lt;script</span>
+  <span class="attr">src</span>=<span class="val">"http://localhost:8765/api/widget/embed.js"</span>
+  <span class="attr">data-company</span>=<span class="val">"Elevate Solar"</span>
+  <span class="attr">data-primary</span>=<span class="val">"%2316a34a"</span>
+<span class="tag">&gt;&lt;/script&gt;</span>
+      <button class="copy-btn" onclick="copyCode('code-basic')">Copy</button>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>🎛️ Embed Modes</h2>
+    <div class="modes-row">
+      <div class="mode-card">
+        <div class="icon">🟢</div>
+        <h3>Floating</h3>
+        <p>Fixed button in corner. Pops open a modal. Works on any page — zero layout impact.</p>
+      </div>
+      <div class="mode-card">
+        <div class="icon">📦</div>
+        <h3>Inline</h3>
+        <p>Mounts inside a <code style="color:#7dd3fc">#target</code> div. Perfect for landing pages and forms.</p>
+      </div>
+      <div class="mode-card">
+        <div class="icon">🔘</div>
+        <h3>Button</h3>
+        <p>Exposes <code style="color:#7dd3fc">SolarWidget.open()</code> so you can trigger the modal from any button.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>🔧 URL Parameters</h2>
+    <div class="params-grid">
+      <div class="param-card">
+        <div class="param-name">company</div>
+        <div class="param-default">Default: "Solar Intelligence"</div>
+        <div class="param-desc">Company name shown in the widget header.</div>
+      </div>
+      <div class="param-card">
+        <div class="param-name">tagline</div>
+        <div class="param-default">Default: "Find out how much you could save"</div>
+        <div class="param-desc">Subtitle text below company name.</div>
+      </div>
+      <div class="param-card">
+        <div class="param-name">primary</div>
+        <div class="param-default">Default: %2316a34a (green)</div>
+        <div class="param-desc">Accent color hex, URL-encoded. E.g. %23FF6B35 for orange.</div>
+      </div>
+      <div class="param-card">
+        <div class="param-name">mode</div>
+        <div class="param-default">Default: floating</div>
+        <div class="param-desc">floating | inline | button</div>
+      </div>
+      <div class="param-card">
+        <div class="param-name">target</div>
+        <div class="param-default">Default: (none)</div>
+        <div class="param-desc">CSS selector for inline mount, e.g. #solar-calculator</div>
+      </div>
+      <div class="param-card">
+        <div class="param-name">phone</div>
+        <div class="param-default">Default: (none)</div>
+        <div class="param-desc">Rep phone number shown on thank-you screen.</div>
+      </div>
+      <div class="param-card">
+        <div class="param-name">rep</div>
+        <div class="param-default">Default: (none)</div>
+        <div class="param-desc">Rep name shown on thank-you screen.</div>
+      </div>
+      <div class="param-card">
+        <div class="param-name">utm_source</div>
+        <div class="param-default">Default: embed_widget</div>
+        <div class="param-desc">UTM source — passed through to lead record.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>💡 Inline Example</h2>
+    <div class="inline-demo">
+      <p>The widget mounts here when <code>mode=inline&amp;target=#inline-demo-mount</code></p>
+      <div id="inline-demo-mount"></div>
+    </div>
+  </div>
+
+  <div class="section api-section">
+    <h2>🔌 Widget API Endpoints</h2>
+    <div class="endpoint">
+      <span class="method get">GET</span>
+      <div>
+        <div class="ep-path">/api/widget/embed.js</div>
+        <div class="ep-desc">Serves the embeddable JavaScript widget. All URL params are forwarded as widget config.</div>
+      </div>
+    </div>
+    <div class="endpoint">
+      <span class="method get">GET</span>
+      <div>
+        <div class="ep-path">/api/widget/demo</div>
+        <div class="ep-desc">This demo page — shows live widget with all three embed modes.</div>
+      </div>
+    </div>
+    <div class="endpoint">
+      <span class="method get">GET</span>
+      <div>
+        <div class="ep-path">/api/widget/snippet?company=...&primary=...&mode=...</div>
+        <div class="ep-desc">Returns embed code as JSON — useful for dashboard snippet generator.</div>
+      </div>
+    </div>
+    <div class="endpoint">
+      <span class="method post">POST</span>
+      <div>
+        <div class="ep-path">/api/widget/submit</div>
+        <div class="ep-desc">Receives lead submissions from the widget. Saves to pipeline DB + optionally Discord webhook. Body: {address, name, phone, email, monthly_bill, lead_score, …}</div>
+      </div>
+    </div>
+    <div class="endpoint">
+      <span class="method get">GET</span>
+      <div>
+        <div class="ep-path">/api/widget/leads</div>
+        <div class="ep-desc">Returns all widget-captured leads sorted by submission time. Query: ?limit=50&priority=HOT</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>📋 Branded Snippet — Copy for your site</h2>
+    <div class="code-block" id="code-full">
+<span class="tag">&lt;!-- Solar Savings Calculator Widget --&gt;</span>
+<span class="tag">&lt;script</span>
+  <span class="attr">src</span>=<span class="val">"http://localhost:8765/api/widget/embed.js?company=Elevate+Solar&amp;tagline=See+how+much+you+could+save&amp;primary=%2316a34a&amp;mode=floating&amp;rep=Your+Name&amp;phone=602-555-0100&amp;utm_source=website"</span>
+  <span class="attr">async</span>
+<span class="tag">&gt;&lt;/script&gt;</span>
+      <button class="copy-btn" onclick="copyCode('code-full')">Copy</button>
+    </div>
+  </div>
+</div>
+
+<script>
+function copyCode(id) {
+  var el = document.getElementById(id);
+  var text = el.innerText.replace(/Copy$/, '').trim();
+  navigator.clipboard.writeText(text).then(function() {
+    var btn = el.querySelector('.copy-btn');
+    btn.textContent = 'Copied!';
+    setTimeout(function() { btn.textContent = 'Copy'; }, 2000);
+  });
+}
+</script>
+
+<!-- Load the widget in inline mode for the demo -->
+<script src="/api/widget/embed.js?mode=inline&target=%23inline-demo-mount&company=Elevate+Solar&tagline=Try+it+—+enter+any+AZ+address" async></script>
+<!-- Also load in floating mode -->
+<script src="/api/widget/embed.js?mode=floating&company=Elevate+Solar&rep=Solar+Advisor&utm_source=demo_page" async></script>
+</body>
+</html>
