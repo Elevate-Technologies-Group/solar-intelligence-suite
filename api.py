@@ -2814,5 +2814,69 @@ async def morning_briefing_post(request: Request):
         raise HTTPException(500, f"Morning briefing error: {e}")
 
 
+@app.get("/api/lead/home-value",
+    summary="Solar home value & equity impact report",
+    tags=["Lead Intelligence"])
+async def home_value_get(
+    address: str = Query(None, description="Full street address"),
+    zip_code: str = Query(None, alias="zip", description="AZ zip code (if no address)"),
+    monthly_bill: float = Query(175.0, description="Monthly utility bill ($)"),
+    enrich: bool = Query(True, description="Enrich with Google Solar API if address provided"),
+):
+    """
+    Returns a full solar home value & equity impact report.
+    Shows how much solar increases the home's resale value using NREL/Zillow/LBNL research.
+    """
+    try:
+        from scripts.home_value_impact import calculate_home_value_impact
+        enrichment = None
+        if address and enrich:
+            try:
+                enrichment = enrich_lead(address, monthly_bill=monthly_bill)
+            except Exception:
+                pass
+        data = calculate_home_value_impact(
+            address=address,
+            monthly_bill=monthly_bill,
+            zip_code=zip_code,
+            enrichment=enrichment,
+        )
+        return JSONResponse(data)
+    except Exception as e:
+        raise HTTPException(500, f"Home value error: {e}")
+
+
+@app.post("/api/lead/home-value",
+    summary="Solar home value & equity impact report (POST)",
+    tags=["Lead Intelligence"])
+async def home_value_post(request: Request):
+    """
+    POST version: accepts {address, zip, monthly_bill, enrich}.
+    Returns full equity impact report with sell scenarios + talking points.
+    """
+    try:
+        from scripts.home_value_impact import calculate_home_value_impact
+        body = await request.json()
+        address      = body.get("address")
+        zip_code     = body.get("zip")
+        monthly_bill = float(body.get("monthly_bill", 175))
+        do_enrich    = body.get("enrich", True)
+        enrichment   = None
+        if address and do_enrich:
+            try:
+                enrichment = enrich_lead(address, monthly_bill=monthly_bill)
+            except Exception:
+                pass
+        data = calculate_home_value_impact(
+            address=address,
+            monthly_bill=monthly_bill,
+            zip_code=zip_code,
+            enrichment=enrichment,
+        )
+        return JSONResponse(data)
+    except Exception as e:
+        raise HTTPException(500, f"Home value error: {e}")
+
+
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8765)

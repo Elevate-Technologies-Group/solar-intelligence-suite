@@ -166,6 +166,7 @@
     <div class="tab" onclick="switchTab('appt-setter')">📞 Appt Setter</div>
     <div class="tab" onclick="switchTab('drip-campaign')">💧 Drip Campaign</div>
     <div class="tab" onclick="switchTab('morning-briefing')">☀️ Morning Briefing</div>
+    <div class="tab" onclick="switchTab('home-value')">🏡 Home Value</div>
     <div class="tab" onclick="switchTab('about')">📖 How It Works</div>
   </div>
 
@@ -1635,6 +1636,104 @@
     </div>
   </div>
 
+  <!-- ═══════════════════════════════════════════════════════════ HOME VALUE TAB -->
+  <div id="tab-home-value" class="panel">
+    <div class="card">
+      <div class="card-title"><span>🏡</span> Solar Home Value &amp; Equity Impact</div>
+      <p style="color:#94a3b8;margin-bottom:16px;">
+        Show homeowners exactly how solar increases their home's resale value — backed by Zillow, NREL, and LBNL research.
+        A powerful closing tool: solar is one of the only upgrades that pays back <em>both</em> monthly AND at closing.
+      </p>
+      <div class="grid-2" style="gap:12px;margin-bottom:16px;">
+        <div>
+          <label class="lbl">Street Address</label>
+          <input id="hv-address" class="inp" placeholder="1905 E Marquette Dr, Gilbert, AZ 85234" style="width:100%">
+        </div>
+        <div>
+          <label class="lbl">Monthly Bill ($)</label>
+          <input id="hv-bill" class="inp" type="number" value="175" min="50" max="1000" style="width:100%">
+        </div>
+      </div>
+      <div class="grid-2" style="gap:12px;margin-bottom:16px;">
+        <div>
+          <label class="lbl">AZ Zip Code (optional if address given)</label>
+          <input id="hv-zip" class="inp" placeholder="85234" maxlength="5" style="width:100%">
+        </div>
+        <div style="display:flex;align-items:flex-end;">
+          <button class="btn" onclick="runHomeValue()" style="width:100%;height:38px;">🏡 Generate Home Value Report</button>
+        </div>
+      </div>
+      <div id="hv-status" style="color:#94a3b8;font-size:13px;min-height:18px;"></div>
+    </div>
+
+    <!-- Stat pills -->
+    <div id="hv-stats" style="display:none;" class="grid-4" style="gap:10px;margin:12px 0;">
+      <div class="stat-card"><div class="stat-val" id="hv-stat-score">—</div><div class="stat-label">Lead Score</div></div>
+      <div class="stat-card"><div class="stat-val" id="hv-stat-premium">—</div><div class="stat-label">Value Premium</div></div>
+      <div class="stat-card"><div class="stat-val" id="hv-stat-savings">—</div><div class="stat-label">Year-1 Savings</div></div>
+      <div class="stat-card"><div class="stat-val" id="hv-stat-roi">—</div><div class="stat-label">25-yr ROI</div></div>
+    </div>
+
+    <!-- Results -->
+    <div id="hv-results" style="display:none;">
+      <!-- Home + System Overview -->
+      <div class="grid-2" style="gap:12px;margin-bottom:12px;">
+        <div class="card">
+          <div class="card-title"><span>🏠</span> Home Value Estimate</div>
+          <table style="width:100%;font-size:13px;border-collapse:collapse;" id="hv-home-table"></table>
+        </div>
+        <div class="card">
+          <div class="card-title"><span>⚡</span> Solar System Overview</div>
+          <table style="width:100%;font-size:13px;border-collapse:collapse;" id="hv-system-table"></table>
+        </div>
+      </div>
+
+      <!-- Value Premium -->
+      <div class="card" style="margin-bottom:12px;">
+        <div class="card-title"><span>📈</span> Solar Home Value Premium (Research-Backed)</div>
+        <div class="grid-4" style="gap:10px;margin-top:10px;" id="hv-premium-grid"></div>
+        <p style="color:#64748b;font-size:11px;margin-top:10px;">
+          Sources: Zillow Research (2021) · LBNL Electricity Markets and Policy · NREL PVWatts · IRS §25D
+        </p>
+      </div>
+
+      <!-- Sell Scenarios -->
+      <div class="card" style="margin-bottom:12px;">
+        <div class="card-title"><span>🏷️</span> If They Sell In...</div>
+        <div style="overflow-x:auto;">
+          <table style="width:100%;font-size:13px;border-collapse:collapse;" id="hv-sell-table">
+            <thead>
+              <tr style="color:#64748b;border-bottom:1px solid #1e293b;">
+                <th style="padding:8px 12px;text-align:left;">Years</th>
+                <th style="padding:8px 12px;text-align:right;">Energy Saved</th>
+                <th style="padding:8px 12px;text-align:right;">Home Value +</th>
+                <th style="padding:8px 12px;text-align:right;">Net Cost</th>
+                <th style="padding:8px 12px;text-align:right;">Total Gain</th>
+                <th style="padding:8px 12px;text-align:center;">Status</th>
+              </tr>
+            </thead>
+            <tbody id="hv-sell-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Talking Points -->
+      <div class="card" style="margin-bottom:12px;">
+        <div class="card-title"><span>🎯</span> Rep Talking Points</div>
+        <ol id="hv-talking-points" style="color:#cbd5e1;font-size:13px;line-height:1.7;padding-left:20px;"></ol>
+      </div>
+
+      <!-- API reference -->
+      <div class="card">
+        <div class="card-title"><span>🔌</span> API Reference</div>
+        <code style="font-size:0.75rem;color:#22c55e;display:block;background:#0f172a;padding:12px;border-radius:6px;white-space:pre-wrap;">GET  /api/lead/home-value?address=1905+E+Marquette+Dr,+Gilbert,+AZ&monthly_bill=175
+POST /api/lead/home-value
+     { "address": "...", "monthly_bill": 175, "zip": "85234", "enrich": true }</code>
+        <p style="color:#64748b;font-size:12px;margin-top:8px;">Use <code>enrich=false</code> to skip Google Solar API call (bill-only estimate, instant).</p>
+      </div>
+    </div>
+  </div>
+
   <div id="tab-about" class="panel">
     <div class="grid-2">
       <div class="card">
@@ -2201,6 +2300,10 @@ function renderLead(d) {
         <button onclick="openDripForLead('${d.address}', ${d.monthly_bill_used||175}, 'new')"
                 style="flex:1;min-width:140px;padding:10px;background:#1e293b;border:1px solid #38bdf8;color:#38bdf8;border-radius:8px;cursor:pointer;font-size:0.85rem;font-weight:600;">
           💧 Drip Campaign
+        </button>
+        <button onclick="openHomeValueForLead('${d.address}', ${d.monthly_bill_used||175})"
+                style="flex:1;min-width:140px;padding:10px;background:#1e293b;border:1px solid #4ade80;color:#4ade80;border-radius:8px;cursor:pointer;font-size:0.85rem;font-weight:600;">
+          🏡 Home Value
         </button>
       </div>
       <div id="ghl-push-result" style="margin-top:10px;font-size:0.82rem;"></div>
@@ -4095,6 +4198,130 @@ async function copyBriefing() {
     btn.textContent = '✅ Copied!';
     setTimeout(() => btn.textContent = '📋 Copy to Clipboard', 2000);
   } catch(e) { alert('Error: ' + e.message); }
+}
+
+// ── Home Value tab ────────────────────────────────────────────────────────────
+function openHomeValueForLead(address, bill) {
+  switchTab('home-value');
+  if (address) document.getElementById('hv-address').value = address;
+  if (bill)    document.getElementById('hv-bill').value = bill;
+}
+
+async function runHomeValue() {
+  const address = document.getElementById('hv-address').value.trim();
+  const bill    = parseFloat(document.getElementById('hv-bill').value) || 175;
+  const zip     = document.getElementById('hv-zip').value.trim();
+  const status  = document.getElementById('hv-status');
+
+  if (!address && !zip) {
+    status.textContent = '⚠ Enter an address or zip code first.';
+    status.style.color = '#f59e0b';
+    return;
+  }
+
+  status.textContent = address
+    ? '🔍 Enriching with Google Solar API + calculating home value...'
+    : '⚡ Calculating home value estimate...';
+  status.style.color = '#94a3b8';
+  document.getElementById('hv-results').style.display = 'none';
+  document.getElementById('hv-stats').style.display = 'none';
+
+  const body = { monthly_bill: bill, enrich: !!address };
+  if (address) body.address = address;
+  if (zip)     body.zip = zip;
+
+  try {
+    const res  = await fetch('/api/lead/home-value', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(body)
+    });
+    if (!res.ok) throw new Error(await res.text());
+    const d = await res.json();
+
+    status.textContent = '✅ Report generated!';
+    status.style.color = '#22c55e';
+
+    // ── Stat pills ──
+    const priColor = { HOT:'#ef4444', WARM:'#f59e0b', COOL:'#3b82f6', LOW:'#64748b' };
+    const scoreEl = document.getElementById('hv-stat-score');
+    if (d.lead_score !== null && d.lead_score !== undefined) {
+      scoreEl.textContent = `${d.lead_score}/100 ${d.lead_grade || ''}`;
+      scoreEl.style.color = priColor[d.priority] || '#f1f5f9';
+    } else {
+      scoreEl.textContent = '—';
+      scoreEl.style.color = '#64748b';
+    }
+    document.getElementById('hv-stat-premium').textContent = '$' + (d.value_premium_mid || 0).toLocaleString();
+    document.getElementById('hv-stat-savings').textContent = '$' + (d.yr1_savings || 0).toLocaleString() + '/yr';
+    document.getElementById('hv-stat-roi').textContent     = '$' + (d.total_roi_mid || 0).toLocaleString();
+    document.getElementById('hv-stats').style.display = '';
+
+    // ── Home table ──
+    const fmt = (n) => n ? '$' + Math.round(n).toLocaleString() : '—';
+    const row = (label, val, color) =>
+      `<tr><td style="padding:5px 8px;color:#64748b;">${label}</td>` +
+      `<td style="padding:5px 8px;text-align:right;color:${color||'#f1f5f9'};font-weight:600;">${val}</td></tr>`;
+
+    document.getElementById('hv-home-table').innerHTML =
+      row('Estimated Value', fmt(d.home_value_estimate)) +
+      row('After Solar (mid)', fmt(d.new_home_value_mid), '#22c55e') +
+      row('Equity Boost', '+' + (d.equity_pct||0).toFixed(1) + '%', '#22c55e') +
+      row('Confidence', (d.home_value_confidence||'').toUpperCase(), '#f59e0b') +
+      row('Source', '<span style="font-size:11px;font-weight:normal;">' + (d.home_value_source||'') + '</span>');
+
+    // ── System table ──
+    document.getElementById('hv-system-table').innerHTML =
+      row('System Size', (d.system_kw||0) + ' kW') +
+      row('Monthly Bill', '$' + (d.monthly_bill||0) + '/mo') +
+      row('Year-1 Savings', fmt(d.yr1_savings), '#22c55e') +
+      row('Payback', (d.payback_yrs||0).toFixed(1) + ' years') +
+      row('25-yr Savings', fmt(d.savings_25yr), '#22c55e') +
+      row('25-yr Bills W/O', fmt(d.bill_25yr), '#ef4444') +
+      row('Federal ITC (30%)', fmt(d.federal_itc), '#22c55e') +
+      row('Net Cost', fmt(d.net_system_cost));
+
+    // ── Value premium grid ──
+    const premGrid = document.getElementById('hv-premium-grid');
+    const premCard = (label, val, sub, color) =>
+      `<div class="stat-card" style="background:#1e293b;border-radius:8px;padding:12px;text-align:center;">
+        <div style="font-size:1.3rem;font-weight:700;color:${color};">+${fmt(val)}</div>
+        <div style="color:#94a3b8;font-size:12px;margin-top:4px;">${label}</div>
+        <div style="color:#64748b;font-size:11px;">${sub}</div>
+      </div>`;
+    premGrid.innerHTML =
+      premCard('Conservative', d.value_premium_low, '+3% of home value', '#f59e0b') +
+      premCard('Avg Pct Method', d.home_value_estimate * 0.04, '+4% Zillow/NREL', '#22c55e') +
+      premCard('Per-Watt (LBNL)', d.system_w * 14.77, '$14.77/W', '#22c55e') +
+      premCard('Blended Estimate', d.value_premium_mid, 'avg of methods', '#34d399');
+
+    // ── Sell scenarios ──
+    const sc = d.sell_scenarios || {};
+    const scOrder = ['1yr', '3yr', '5yr', '7yr', '10yr'];
+    document.getElementById('hv-sell-body').innerHTML = scOrder.map(k => {
+      const s = sc[k]; if (!s) return '';
+      const gc = s.profitable ? '#22c55e' : '#ef4444';
+      const st = s.profitable ? '✅ Profit' : '❌ Loss';
+      return `<tr style="border-bottom:1px solid #0f172a;">
+        <td style="padding:8px 12px;color:#94a3b8;">${s.years} yr</td>
+        <td style="padding:8px 12px;text-align:right;color:#f1f5f9;">${fmt(s.energy_savings)}</td>
+        <td style="padding:8px 12px;text-align:right;color:#22c55e;">+${fmt(s.equity_gain)}</td>
+        <td style="padding:8px 12px;text-align:right;color:#ef4444;">-${fmt(s.net_cost)}</td>
+        <td style="padding:8px 12px;text-align:right;color:${gc};font-weight:700;">${fmt(s.total_gain)}</td>
+        <td style="padding:8px 12px;text-align:center;color:${gc};">${st}</td>
+      </tr>`;
+    }).join('');
+
+    // ── Talking points ──
+    const tpEl = document.getElementById('hv-talking-points');
+    tpEl.innerHTML = (d.talking_points || []).map(tp =>
+      `<li style="margin-bottom:10px;">${tp}</li>`
+    ).join('');
+
+    document.getElementById('hv-results').style.display = '';
+  } catch(e) {
+    status.textContent = '❌ Error: ' + e.message;
+    status.style.color = '#ef4444';
+  }
 }
 
 </script>
