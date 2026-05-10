@@ -163,6 +163,7 @@
     <div class="tab" onclick="switchTab('pipeline')" id="pipeline-tab">📊 Pipeline CRM</div>
     <div class="tab" onclick="switchTab('report-card')">📋 Report Card</div>
     <div class="tab" onclick="switchTab('widget')">🌐 Website Widget</div>
+    <div class="tab" onclick="switchTab('appt-setter')">📞 Appt Setter</div>
     <div class="tab" onclick="switchTab('about')">📖 How It Works</div>
   </div>
 
@@ -1367,6 +1368,108 @@
     </div>
   </div>
 
+  <!-- APPOINTMENT SETTER PANEL -->
+  <div id="tab-appt-setter" class="panel">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px">
+      <div class="card" style="grid-column:1/-1">
+        <div class="card-title"><span>📞</span> Appointment-Setting Communication Toolkit</div>
+        <p style="color:var(--text-muted);margin:0 0 14px">Generate a complete outreach kit personalized with real satellite solar data — phone script, voicemail drop, 3-touch SMS sequence, intro + follow-up emails, and appointment confirmation messages.</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:14px">
+          <div><label class="label">Address (optional)</label><input id="as-address" class="input" placeholder="1905 E Marquette Dr, Gilbert AZ" style="width:100%"></div>
+          <div><label class="label">Monthly Bill ($)</label><input id="as-bill" class="input" type="number" value="175" style="width:100%"></div>
+          <div><label class="label">Utility Rate ($/kWh)</label><input id="as-rate" class="input" type="number" step="0.01" value="0.14" style="width:100%"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:18px">
+          <div><label class="label">Rep Name</label><input id="as-rep-name" class="input" placeholder="Jake Rivera" style="width:100%"></div>
+          <div><label class="label">Rep Phone</label><input id="as-rep-phone" class="input" placeholder="602-555-0100" style="width:100%"></div>
+          <div><label class="label">Company Name</label><input id="as-rep-company" class="input" placeholder="Elevate Solar" style="width:100%"></div>
+        </div>
+        <button onclick="loadApptSetter()" id="as-btn" style="padding:10px 28px;background:linear-gradient(135deg,#22d3ee,#0891b2);border:none;border-radius:8px;color:#0f172a;font-weight:700;cursor:pointer;font-size:14px">📞 Generate Kit</button>
+        <span style="color:var(--text-muted);font-size:12px;margin-left:14px">Real satellite data injected when address is provided</span>
+      </div>
+    </div>
+
+    <!-- Results -->
+    <div id="as-result" style="display:none">
+      <!-- Stat bar -->
+      <div id="as-stats" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px"></div>
+
+      <!-- Phone Script -->
+      <div class="card" style="margin-bottom:14px">
+        <div class="card-title" style="cursor:pointer" onclick="toggleSection('as-phone')">
+          <span>📞</span> Cold Call Phone Script <span style="font-size:11px;color:var(--text-muted)">(click to expand)</span>
+        </div>
+        <div id="as-phone" style="display:none">
+          <div id="as-phone-content"></div>
+        </div>
+      </div>
+
+      <!-- Voicemail -->
+      <div class="card" style="margin-bottom:14px">
+        <div class="card-title" style="cursor:pointer" onclick="toggleSection('as-voicemail')">
+          <span>📲</span> Voicemail Drop Script <span style="font-size:11px;color:var(--text-muted)">(read word-for-word, ≤20 sec)</span>
+        </div>
+        <div id="as-voicemail" style="display:none">
+          <div id="as-voicemail-content" style="background:#0f172a;border-radius:8px;padding:16px;font-family:monospace;font-size:13px;color:#e2e8f0;white-space:pre-wrap;line-height:1.6"></div>
+          <button onclick="copyText('as-voicemail-content')" style="margin-top:10px;padding:6px 14px;background:#1e293b;border:1px solid #334155;border-radius:6px;color:#94a3b8;cursor:pointer;font-size:12px">📋 Copy</button>
+        </div>
+      </div>
+
+      <!-- SMS Sequence -->
+      <div class="card" style="margin-bottom:14px">
+        <div class="card-title" style="cursor:pointer" onclick="toggleSection('as-sms')">
+          <span>💬</span> 3-Touch SMS Sequence <span style="font-size:11px;color:var(--text-muted)">Day 1 · Day 3 · Day 7</span>
+        </div>
+        <div id="as-sms" style="display:none">
+          <div id="as-sms-content"></div>
+        </div>
+      </div>
+
+      <!-- Email Templates -->
+      <div class="card" style="margin-bottom:14px">
+        <div class="card-title" style="cursor:pointer" onclick="toggleSection('as-email')">
+          <span>📧</span> Email Templates <span style="font-size:11px;color:var(--text-muted)">Intro + Follow-Up</span>
+        </div>
+        <div id="as-email" style="display:none">
+          <div id="as-email-content"></div>
+        </div>
+      </div>
+
+      <!-- Confirmation -->
+      <div class="card" style="margin-bottom:14px">
+        <div class="card-title" style="cursor:pointer" onclick="toggleSection('as-confirm')">
+          <span>✅</span> Appointment Confirmation <span style="font-size:11px;color:var(--text-muted)">Text + Email</span>
+        </div>
+        <div id="as-confirm" style="display:none">
+          <div id="as-confirm-content"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pro Tips -->
+    <div class="card" style="background:linear-gradient(135deg,rgba(34,211,238,0.07),rgba(16,185,129,0.07));border-color:rgba(34,211,238,0.2)">
+      <div class="card-title"><span>💡</span> Pro Tips</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div style="font-size:13px;color:var(--text-muted)">
+          <div style="color:var(--green);font-weight:700;margin-bottom:4px">📊 Use Real Data</div>
+          Always enter the homeowner's address before your call. "Your home scores 82/100 for solar" lands 3× better than "most homes in Phoenix..."
+        </div>
+        <div style="font-size:13px;color:var(--text-muted)">
+          <div style="color:var(--green);font-weight:700;margin-bottom:4px">💬 SMS First</div>
+          Send the Day 1 SMS 30 minutes before you call. When they answer, you can say "Did you get my text about your home's score?" — instant warm open.
+        </div>
+        <div style="font-size:13px;color:var(--text-muted)">
+          <div style="color:var(--green);font-weight:700;margin-bottom:4px">📧 Email the Report Card</div>
+          After the call, send the Report Card HTML (from the Report Card tab). It's a shareable link they can forward to their spouse.
+        </div>
+        <div style="font-size:13px;color:var(--text-muted)">
+          <div style="color:var(--green);font-weight:700;margin-bottom:4px">🔁 Sequence Timing</div>
+          Day 1: Call + SMS · Day 2: Voicemail if no answer · Day 3: Follow-up SMS · Day 5: Email 1 · Day 7: Final SMS + Email 2
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div id="tab-about" class="panel">
     <div class="grid-2">
       <div class="card">
@@ -1925,6 +2028,10 @@ function renderLead(d) {
         <button onclick="openReportCardForLead('${d.address}', ${d.monthly_bill_used||175})"
                 style="flex:1;min-width:140px;padding:10px;background:#1e293b;border:1px solid #22c55e;color:#22c55e;border-radius:8px;cursor:pointer;font-size:0.85rem;font-weight:600;">
           📋 Report Card
+        </button>
+        <button onclick="openApptSetterForLead('${d.address}', ${d.monthly_bill_used||175})"
+                style="flex:1;min-width:140px;padding:10px;background:#1e293b;border:1px solid #22d3ee;color:#22d3ee;border-radius:8px;cursor:pointer;font-size:0.85rem;font-weight:600;">
+          📞 Appt Setter
         </button>
       </div>
       <div id="ghl-push-result" style="margin-top:10px;font-size:0.82rem;"></div>
@@ -3401,6 +3508,134 @@ async function loadWidgetLeads() {
   } catch(e) {
     el.innerHTML = `<p style="color:var(--red)">Error loading leads: ${e.message}</p>`;
   }
+}
+
+// ── Appointment Setter tab ─────────────────────────────────────────────────────
+
+function toggleSection(id) {
+  const el = document.getElementById(id);
+  if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+function copyText(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  navigator.clipboard.writeText(el.innerText || el.textContent).then(() => {
+    const btn = el.parentElement.querySelector('button');
+    if (btn) { const orig = btn.textContent; btn.textContent = '✅ Copied!'; setTimeout(() => btn.textContent = orig, 1800); }
+  });
+}
+
+async function loadApptSetter() {
+  const btn = document.getElementById('as-btn');
+  btn.disabled = true; btn.textContent = '⏳ Generating...';
+
+  const address  = document.getElementById('as-address').value.trim();
+  const bill     = parseFloat(document.getElementById('as-bill').value) || 175;
+  const rate     = parseFloat(document.getElementById('as-rate').value) || 0.14;
+  const repName  = document.getElementById('as-rep-name').value.trim() || '[YOUR NAME]';
+  const repPhone = document.getElementById('as-rep-phone').value.trim() || '[YOUR PHONE]';
+  const repCo    = document.getElementById('as-rep-company').value.trim() || 'our solar team';
+
+  try {
+    const params = new URLSearchParams({ monthly_bill: bill, utility_rate: rate,
+      rep_name: repName, rep_phone: repPhone, rep_company: repCo });
+    if (address) params.set('address', address);
+    const res = await fetch(`/api/lead/appointment-setter?${params}`);
+    if (!res.ok) throw new Error(`API error ${res.status}`);
+    const d = await res.json();
+
+    // Stat bar
+    const pColor = d.priority === 'HOT' ? '#10b981' : d.priority === 'WARM' ? '#f59e0b' : '#94a3b8';
+    const statsHtml = [
+      { label: 'Lead Score', val: d.score ? `${d.score}/100 ${d.grade}` : 'Estimated', color: pColor },
+      { label: 'Priority', val: d.priority || 'N/A', color: pColor },
+      { label: 'Year 1 Savings', val: `$${(d.annual_savings_usd || 0).toLocaleString()}`, color: '#10b981' },
+      { label: 'Monthly Savings', val: `$${d.monthly_savings_usd || 0}`, color: '#10b981' },
+    ].map(s => `<div style="background:var(--surface);border-radius:10px;padding:14px;text-align:center">
+      <div style="font-size:20px;font-weight:800;color:${s.color}">${s.val}</div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:4px">${s.label}</div>
+    </div>`).join('');
+    document.getElementById('as-stats').innerHTML = statsHtml;
+
+    // Phone script
+    const ps = d.phone_script || {};
+    const psFields = ['opener','permission','data_hook','savings_pitch','incentive','payback','soft_close','objection_bridge_price','objection_bridge_thinking','close'];
+    const psLabels = ['Opener','Permission Ask','Data Hook','Savings Pitch','Federal Incentive','Payback / ROI','Soft Close','Objection: Too Expensive','Objection: Need to Think','Close'];
+    document.getElementById('as-phone-content').innerHTML = psFields.map((k, i) =>
+      `<div style="margin-bottom:16px">
+        <div style="font-size:11px;font-weight:700;color:#22d3ee;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">${psLabels[i]}</div>
+        <div style="background:#0f172a;border-radius:8px;padding:14px;font-size:13px;color:#e2e8f0;line-height:1.7;white-space:pre-wrap">${ps[k] || ''}</div>
+        <button onclick="copyText('as-ps-${i}')" style="margin-top:6px;padding:4px 12px;background:#1e293b;border:1px solid #334155;border-radius:6px;color:#94a3b8;cursor:pointer;font-size:11px">📋 Copy</button>
+      </div>`
+    ).join('');
+    // Add IDs for copy (re-render with IDs)
+    document.getElementById('as-phone-content').innerHTML = psFields.map((k, i) =>
+      `<div style="margin-bottom:16px">
+        <div style="font-size:11px;font-weight:700;color:#22d3ee;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">${psLabels[i]}</div>
+        <div id="as-ps-${i}" style="background:#0f172a;border-radius:8px;padding:14px;font-size:13px;color:#e2e8f0;line-height:1.7;white-space:pre-wrap">${ps[k] || ''}</div>
+        <button onclick="copyText('as-ps-${i}')" style="margin-top:6px;padding:4px 12px;background:#1e293b;border:1px solid #334155;border-radius:6px;color:#94a3b8;cursor:pointer;font-size:11px">📋 Copy</button>
+      </div>`
+    ).join('');
+
+    // Voicemail
+    document.getElementById('as-voicemail-content').textContent = d.voicemail || '';
+
+    // SMS Sequence
+    const smsColors = ['#10b981', '#f59e0b', '#94a3b8'];
+    document.getElementById('as-sms-content').innerHTML = (d.sms_sequence || []).map((s, i) =>
+      `<div style="margin-bottom:16px;border-left:3px solid ${smsColors[i]};padding-left:14px">
+        <div style="font-size:12px;font-weight:700;color:${smsColors[i]};margin-bottom:6px">DAY ${s.day} — ${s.label}</div>
+        <div id="as-sms-${i}" style="background:#0f172a;border-radius:8px;padding:14px;font-size:13px;color:#e2e8f0;line-height:1.7;white-space:pre-wrap">${s.text || ''}</div>
+        <button onclick="copyText('as-sms-${i}')" style="margin-top:6px;padding:4px 12px;background:#1e293b;border:1px solid #334155;border-radius:6px;color:#94a3b8;cursor:pointer;font-size:11px">📋 Copy</button>
+      </div>`
+    ).join('');
+
+    // Email templates
+    function emailBlock(title, subj, body, idSuf) {
+      return `<div style="margin-bottom:20px">
+        <div style="font-size:12px;font-weight:700;color:#f59e0b;margin-bottom:4px">${title}</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:6px">SUBJECT: <strong style="color:#e2e8f0">${subj}</strong></div>
+        <div id="as-email-${idSuf}" style="background:#0f172a;border-radius:8px;padding:14px;font-size:13px;color:#e2e8f0;line-height:1.7;white-space:pre-wrap">${body}</div>
+        <button onclick="copyText('as-email-${idSuf}')" style="margin-top:6px;padding:4px 12px;background:#1e293b;border:1px solid #334155;border-radius:6px;color:#94a3b8;cursor:pointer;font-size:11px">📋 Copy</button>
+      </div>`;
+    }
+    document.getElementById('as-email-content').innerHTML =
+      emailBlock('EMAIL 1 — INTRO', (d.email_intro||{}).subject || '', (d.email_intro||{}).body || '', 'intro') +
+      emailBlock('EMAIL 2 — FOLLOW-UP', (d.email_followup||{}).subject || '', (d.email_followup||{}).body || '', 'followup');
+
+    // Confirmation
+    document.getElementById('as-confirm-content').innerHTML = `
+      <div style="margin-bottom:14px">
+        <div style="font-size:12px;font-weight:700;color:#10b981;margin-bottom:6px">CONFIRMATION TEXT</div>
+        <div id="as-confirm-sms" style="background:#0f172a;border-radius:8px;padding:14px;font-size:13px;color:#e2e8f0;line-height:1.7;white-space:pre-wrap">${d.confirm_sms || ''}</div>
+        <button onclick="copyText('as-confirm-sms')" style="margin-top:6px;padding:4px 12px;background:#1e293b;border:1px solid #334155;border-radius:6px;color:#94a3b8;cursor:pointer;font-size:11px">📋 Copy</button>
+      </div>
+      <div>
+        <div style="font-size:12px;font-weight:700;color:#10b981;margin-bottom:4px">CONFIRMATION EMAIL</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:6px">SUBJECT: <strong style="color:#e2e8f0">${(d.confirm_email||{}).subject || ''}</strong></div>
+        <div id="as-confirm-email" style="background:#0f172a;border-radius:8px;padding:14px;font-size:13px;color:#e2e8f0;line-height:1.7;white-space:pre-wrap">${(d.confirm_email||{}).body || ''}</div>
+        <button onclick="copyText('as-confirm-email')" style="margin-top:6px;padding:4px 12px;background:#1e293b;border:1px solid #334155;border-radius:6px;color:#94a3b8;cursor:pointer;font-size:11px">📋 Copy</button>
+      </div>`;
+
+    // Show results + auto-expand phone script
+    document.getElementById('as-result').style.display = 'block';
+    document.getElementById('as-phone').style.display = 'block';
+    document.getElementById('as-voicemail').style.display = 'block';
+    document.getElementById('as-sms').style.display = 'block';
+    document.getElementById('as-result').scrollIntoView({ behavior: 'smooth' });
+
+  } catch(e) {
+    alert('Error generating kit: ' + e.message);
+  }
+  btn.disabled = false; btn.textContent = '📞 Generate Kit';
+}
+
+function openApptSetterForLead(address, bill) {
+  switchTab('appt-setter');
+  if (address) document.getElementById('as-address').value = address;
+  if (bill) document.getElementById('as-bill').value = bill;
+  setTimeout(loadApptSetter, 300);
 }
 
 </script>

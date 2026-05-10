@@ -2453,5 +2453,83 @@ async def widget_leads(
         raise HTTPException(500, f"Widget leads error: {e}")
 
 
+
+# ── /api/lead/appointment-setter ──────────────────────────────────────────────
+
+@app.get("/api/lead/appointment-setter")
+async def appointment_setter_get(
+    address: str | None = None,
+    monthly_bill: float = 175.0,
+    utility_rate: float = 0.14,
+    rep_name: str = "[YOUR NAME]",
+    rep_phone: str = "[YOUR PHONE]",
+    rep_company: str = "our solar team",
+    no_enrich: bool = False,
+):
+    """
+    Generate a full appointment-setting comms kit for a property.
+    Returns: phone_script, voicemail, sms_sequence, email_intro, email_followup,
+             confirm_sms, confirm_email — all personalized with real solar data.
+    """
+    try:
+        from scripts.appointment_setter import generate_appointment_kit
+        lead = None
+        if address and not no_enrich:
+            try:
+                lead = enrich_lead(address, monthly_bill, utility_rate)
+                if lead.get("error"):
+                    lead = None
+            except Exception:
+                lead = None
+
+        kit = generate_appointment_kit(
+            lead=lead,
+            monthly_bill=monthly_bill,
+            rep_name=rep_name,
+            rep_phone=rep_phone,
+            rep_company=rep_company,
+        )
+        return JSONResponse(kit)
+    except Exception as e:
+        raise HTTPException(500, f"Appointment setter error: {e}")
+
+
+@app.post("/api/lead/appointment-setter")
+async def appointment_setter_post(request: Request):
+    """
+    POST version — body: {address, monthly_bill, utility_rate, rep_name, rep_phone, rep_company, no_enrich}
+    """
+    try:
+        from scripts.appointment_setter import generate_appointment_kit
+        body = await request.json()
+        address      = body.get("address")
+        monthly_bill = float(body.get("monthly_bill", 175))
+        utility_rate = float(body.get("utility_rate", 0.14))
+        rep_name     = body.get("rep_name", "[YOUR NAME]")
+        rep_phone    = body.get("rep_phone", "[YOUR PHONE]")
+        rep_company  = body.get("rep_company", "our solar team")
+        no_enrich    = bool(body.get("no_enrich", False))
+
+        lead = None
+        if address and not no_enrich:
+            try:
+                lead = enrich_lead(address, monthly_bill, utility_rate)
+                if lead.get("error"):
+                    lead = None
+            except Exception:
+                lead = None
+
+        kit = generate_appointment_kit(
+            lead=lead,
+            monthly_bill=monthly_bill,
+            rep_name=rep_name,
+            rep_phone=rep_phone,
+            rep_company=rep_company,
+        )
+        return JSONResponse(kit)
+    except Exception as e:
+        raise HTTPException(500, f"Appointment setter error: {e}")
+
+
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8765)
